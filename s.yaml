@@ -1,0 +1,91 @@
+# ──────────────────────────────────────
+# Idea Weaver — 阿里云 FC 声明式部署
+# 用法: s deploy
+# 文档: https://docs.serverless-devs.com/fc/yaml/readme
+# ──────────────────────────────────────
+edition: 3.0.0
+name: idea-weaver
+access: "default"
+
+vars:
+  region: cn-hangzhou
+  service: idea-weaver
+
+resources:
+  weaver_api:
+    component: fc3
+    props:
+      region: ${vars.region}
+      serviceName: ${vars.service}
+      functionName: idea-weaver-api
+      description: "Idea Weaver — 碎碎念到设计文档的 AI 助手"
+      runtime: custom.debian10
+      code: ./
+      handler: not-used
+      cpu: 2
+      memorySize: 4096
+      diskSize: 10240
+      timeout: 600
+      instanceConcurrency: 1
+      instanceType: e1
+      customRuntimeConfig:
+        command: ["/code/fc/bootstrap"]
+        args: []
+      environmentVariables:
+        LLM_PROVIDER: litellm
+        EMBEDDING_MODEL: ${env(EMBEDDING_MODEL, text-embedding-3-small)}
+        WEAVER_MODEL: ${env(WEAVER_MODEL, claude-sonnet-5)}
+        LIGHT_MODEL: ${env(LIGHT_MODEL, claude-haiku-4-5-20251001)}
+        WEAVER_MAX_ITERATIONS: "3"
+        LOG_LEVEL: info
+        DATA_DIR: /mnt/auto/weaver/data
+        DEPLOY_MODE: fc
+        ANTHROPIC_API_KEY: ${env(ANTHROPIC_API_KEY)}
+        OPENAI_API_KEY: ${env(OPENAI_API_KEY)}
+      layers: []
+      nasConfig:
+        userId: 1000
+        groupId: 1000
+        mountPoints:
+          - serverAddr: ${env(NAS_ADDR)}:/weaver
+            mountDir: /mnt/auto/weaver
+      triggers:
+        - triggerName: http
+          triggerType: http
+          triggerConfig:
+            methods: [GET, POST, PUT, DELETE, OPTIONS]
+            authType: anonymous
+            disableURLInternet: false
+
+  weaver_async_worker:
+    component: fc3
+    props:
+      region: ${vars.region}
+      serviceName: ${vars.service}
+      functionName: idea-weaver-async-worker
+      description: "异步编织 Worker"
+      runtime: custom.debian10
+      code: ./
+      handler: not-used
+      cpu: 2
+      memorySize: 4096
+      diskSize: 10240
+      timeout: 86400
+      instanceConcurrency: 1
+      instanceType: e1
+      customRuntimeConfig:
+        command: ["/code/fc/bootstrap-async-worker"]
+        args: []
+      environmentVariables:
+        DATA_DIR: /mnt/auto/weaver/data
+        DEPLOY_MODE: fc
+        ANTHROPIC_API_KEY: ${env(ANTHROPIC_API_KEY)}
+        EMBEDDING_MODEL: ${env(EMBEDDING_MODEL, text-embedding-3-small)}
+        WEAVER_MODEL: ${env(WEAVER_MODEL, claude-sonnet-5)}
+      layers: []
+      nasConfig:
+        userId: 1000
+        groupId: 1000
+        mountPoints:
+          - serverAddr: ${env(NAS_ADDR)}:/weaver
+            mountDir: /mnt/auto/weaver

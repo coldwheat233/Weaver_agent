@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+echo "=== Idea Weaver FC Runtime ==="
+export PYTHONPATH=/opt/python/lib/python3.11/site-packages:$PYTHONPATH
+export DEPLOY_MODE=fc
+mkdir -p /mnt/auto/weaver/data/{chroma,assets/images,assets/audio,logs}
+mkdir -p /mnt/auto/weaver/exports
+exec python -m uvicorn src.api.server:app --host 0.0.0.0 --port 9000 --workers 1

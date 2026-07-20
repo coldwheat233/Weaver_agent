@@ -1,0 +1,19 @@
+# FC 部署忽略
+tests/
+data/
+exports/
+node_modules/
+.pytest_cache/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+.env.example
+*.egg-info/
+DESIGN.md
+README.md
+docker-compose.yml
+Dockerfile
+pyinstaller.spec
+scripts/

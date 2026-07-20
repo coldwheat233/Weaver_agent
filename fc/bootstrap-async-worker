@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+echo "=== Idea Weaver (FC Async Worker) ==="
+export PYTHONPATH=/opt/python/lib/python3.11/site-packages:$PYTHONPATH
+export DEPLOY_MODE=fc
+exec python /code/src/fc_async_worker.py

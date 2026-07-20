@@ -1,0 +1,4 @@
+@echo off
+cd /d D:\PY_PROJ\WEAVE
+echo Starting Idea Weaver Overlay...
+start pythonw -c "import webview,os,ctypes,time,sys; sys.path.insert(0,'D:/PY_PROJ/WEAVE'); sys.path.insert(0,'D:/PY_PROJ/WEAVE/src'); os.chdir('D:/PY_PROJ/WEAVE'); html=open('src/ui/static/index.html','r',encoding='utf-8').read(); w=webview.create_window('Idea Weaver',html=html,width=480,height=440,frameless=True,on_top=True,easy_drag=False,background_color='#FBFBFB'); user32=ctypes.windll.user32; class R(ctypes.Structure):_fields_=[('l',ctypes.c_long),('t',ctypes.c_long),('r',ctypes.c_long),('b',ctypes.c_long)]; class M(ctypes.Structure):_fields_=[('cb',ctypes.c_ulong),('rcM',R),('rcW',R),('f',ctypes.c_ulong)]; mi=M();mi.cb=ctypes.sizeof(M); user32.GetMonitorInfoW(user32.MonitorFromWindow(user32.GetForegroundWindow(),2),ctypes.byref(mi)); ww=mi.rcW.r-mi.rcW.l;wh=mi.rcW.b-mi.rcW.t; w.move(mi.rcW.l+(ww-480)//2,mi.rcW.t+(wh-440)//2); webview.start()"

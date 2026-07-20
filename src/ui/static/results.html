@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Idea Weaver — 设计结果</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="stylesheet" href="results.css">
+</head>
+<body>
+
+<header class="result-header">
+  <h1 id="design-title">加载中...</h1>
+  <p class="meta" id="design-meta"></p>
+</header>
+
+<section class="score-cards" id="score-cards">
+  <div class="score-card">
+    <svg class="score-ring" viewBox="0 0 56 56">
+      <circle class="ring-bg" cx="28" cy="28" r="24"/>
+      <circle class="ring-fill" id="ring-innovation" cx="28" cy="28" r="24"/>
+    </svg>
+    <span class="score-value" id="score-innovation">-</span>
+    <span class="score-label">创新度</span>
+  </div>
+  <div class="score-card">
+    <svg class="score-ring" viewBox="0 0 56 56">
+      <circle class="ring-bg" cx="28" cy="28" r="24"/>
+      <circle class="ring-fill" id="ring-coherence" cx="28" cy="28" r="24"/>
+    </svg>
+    <span class="score-value" id="score-coherence">-</span>
+    <span class="score-label">自洽性</span>
+  </div>
+  <div class="score-card">
+    <svg class="score-ring" viewBox="0 0 56 56">
+      <circle class="ring-bg" cx="28" cy="28" r="24"/>
+      <circle class="ring-fill" id="ring-feasibility" cx="28" cy="28" r="24"/>
+    </svg>
+    <span class="score-value" id="score-feasibility">-</span>
+    <span class="score-label">可行性</span>
+  </div>
+</section>
+
+<section id="mermaid-section">
+  <h2>架构概览</h2>
+  <div class="mermaid-container" id="mermaid-render"></div>
+</section>
+
+<section id="graph-section">
+  <h2>概念关联图</h2>
+  <div id="d3-graph"></div>
+</section>
+
+<section id="content-section">
+  <div id="markdown-content"></div>
+</section>
+
+<script src="results.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idea Weaver</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <div id="overlay" class="overlay visible">
+
+    <textarea
+      id="idea-input"
+      class="input-area"
+      placeholder="写下你的想法……"
+      rows="3"
+      autofocus
+    ></textarea>
+
+    <div id="attachments" class="attachments"></div>
+
+    <div id="recording-bar" class="recording-bar hidden">
+      <span class="recording-dot"></span>
+      <span id="recording-time" class="recording-time">00:00</span>
+    </div>
+
+    <p class="hint">Ctrl+↵ 提交 &nbsp;·&nbsp; Esc 取消 &nbsp;·&nbsp; Ctrl+V 粘贴图片</p>
+
+    <button id="submit-btn" class="submit-btn" disabled>
+      <span class="btn-text">捕捉想法</span>
+      <span class="btn-arrow">→</span>
+    </button>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

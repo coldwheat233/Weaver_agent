@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  weaver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: idea-weaver:latest
+    container_name: idea-weaver
+    restart: unless-stopped
+    ports:
+      - "${WEAVER_PORT:-8765}:8765"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - WEAVER_MODEL=${WEAVER_MODEL:-claude-sonnet-5}
+      - DEPLOY_MODE=docker
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - weaver_data:/home/weaver/app/data
+      - weaver_exports:/home/weaver/app/exports
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: "4G" }
+        reservations: { cpus: "1", memory: "2G" }
+
+volumes:
+  weaver_data:
+  weaver_exports:

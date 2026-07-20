@@ -1,0 +1,99 @@
+/* ═══════════════════════════════════
+   Idea Weaver — Results Viewer
+   ═══════════════════════════════════ */
+:root {
+  --bg: #FCFCFD;
+  --text: #1A1A2E;
+  --text-secondary: #6E6E7C;
+  --accent: #0891B2;
+  --accent-subtle: #ECFEFF;
+  --surface: #F3F3F5;
+  --radius: 14px;
+  --max-width: 780px;
+  --ring-size: 56px;
+  --ring-width: 4px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.7;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 48px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+.result-header { text-align: center; margin-bottom: 32px; }
+.result-header h1 { font-size: 28px; font-weight: 600; }
+.meta { color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
+
+/* Score Cards */
+.score-cards {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin: 32px 0 48px;
+}
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 32px;
+  background: #FFF;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+}
+.score-ring { width: var(--ring-size); height: var(--ring-size); transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--surface); stroke-width: var(--ring-width); }
+.ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: var(--ring-width);
+  stroke-linecap: round;
+  stroke-dasharray: 150.8;
+  stroke-dashoffset: 150.8;
+  transition: stroke-dashoffset 1s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.score-value { font-size: 22px; font-weight: 600; color: var(--accent); }
+.score-label { font-size: 12px; color: var(--text-secondary); letter-spacing: 0.5px; }
+
+/* Sections */
+section { margin: 48px 0; }
+h2 { font-size: 20px; font-weight: 600; color: var(--accent); margin-bottom: 20px; }
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFF;
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  overflow-x: auto;
+}
+
+/* D3 Graph */
+#d3-graph {
+  width: 100%;
+  height: 420px;
+  background: #FFF;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Markdown content */
+#markdown-content { background: #FFF; border-radius: var(--radius); padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+#markdown-content h1 { font-size: 24px; font-weight: 600; margin: 32px 0 12px; }
+#markdown-content h2 { font-size: 20px; font-weight: 600; margin: 28px 0 10px; color: var(--accent); }
+#markdown-content h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; }
+#markdown-content p { margin: 8px 0; }
+#markdown-content pre { background: var(--surface); border-radius: 12px; padding: 20px; overflow-x: auto; font-size: 13px; }
+#markdown-content code { font-family: "Cascadia Code", "Fira Code", monospace; font-size: 0.9em; }
+#markdown-content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+#markdown-content th, #markdown-content td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #E5E5E8; }
+#markdown-content th { font-weight: 600; color: var(--text-secondary); font-size: 12px; }
+#markdown-content blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 12px 0; color: var(--text-secondary); background: var(--accent-subtle); border-radius: 0 8px 8px 0; }

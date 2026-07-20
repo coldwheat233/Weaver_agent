@@ -1,0 +1,62 @@
+[
+  {
+    "content": "需要设计一个API网关限流系统，支持分布式部署",
+    "source_type": "text",
+    "expected_tags": ["problem_statement"],
+    "expected_domains": ["api_gateway", "rate_limiting", "distributed_systems"]
+  },
+  {
+    "content": "使用Redis作为分布式计数器，滑动窗口算法",
+    "source_type": "text",
+    "expected_tags": ["solution_hypothesis"],
+    "expected_domains": ["redis", "caching", "algorithm"]
+  },
+  {
+    "content": "系统必须支持水平扩展，承载10000 QPS",
+    "source_type": "text",
+    "expected_tags": ["constraint"],
+    "expected_domains": ["scalability", "performance"]
+  },
+  {
+    "content": "像高速公路的快慢车道一样，请求应该分优先级",
+    "source_type": "text",
+    "expected_tags": ["analogy"],
+    "expected_domains": ["traffic_management", "qos", "priority"]
+  },
+  {
+    "content": "限流失败时应该降级而非拒绝请求——返回缓存数据",
+    "source_type": "text",
+    "expected_tags": ["solution_hypothesis", "constraint"],
+    "expected_domains": ["fault_tolerance", "degradation", "caching"]
+  },
+  {
+    "content": "整个集群需要强一致性保证，不能用最终一致",
+    "source_type": "text",
+    "expected_tags": ["constraint"],
+    "expected_domains": ["consistency", "distributed_systems"]
+  },
+  {
+    "content": "优先保障可用性和分区容错而不是数据一致性",
+    "source_type": "text",
+    "expected_tags": ["constraint"],
+    "expected_domains": ["availability", "cap_theorem"]
+  },
+  {
+    "content": "需要监控面板展示实时限流状态和拒绝率",
+    "source_type": "text",
+    "expected_tags": ["feature_idea"],
+    "expected_domains": ["monitoring", "observability", "dashboard"]
+  },
+  {
+    "content": "限流规则要能动态更新——运营可以随时调整阈值",
+    "source_type": "text",
+    "expected_tags": ["feature_idea", "constraint"],
+    "expected_domains": ["dynamic_config", "operations"]
+  },
+  {
+    "content": "现有架构是Kubernetes + Istio，限流应该集成到Service Mesh层",
+    "source_type": "text",
+    "expected_tags": ["constraint", "observation"],
+    "expected_domains": ["kubernetes", "service_mesh", "istio"]
+  }
+]

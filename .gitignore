@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Runtime data
+data/
+exports/
+~/.weaver/
+
+# Build artifacts
+dist/
+build/
+*.spec.bak
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/binaries/
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,330 @@
+/* ═══════════════════════════════════
+   Idea Weaver — Capture Overlay
+   设计方向：白/灰/青 · 无边框 · 大圆角 · 弹簧动画
+   ═══════════════════════════════════ */
+
+:root {
+  /* 色彩 */
+  --color-bg:            #FBFBFB;
+  --color-surface:       #F3F3F5;
+  --color-surface-hover: #EBEBED;
+  --color-border:        transparent;
+  --color-separator:     #E5E5E8;
+
+  --color-text-primary:   #1A1A2E;
+  --color-text-secondary: #6E6E7C;
+  --color-text-tertiary:  #A0A0AC;
+
+  --color-accent:         #0891B2;
+  --color-accent-light:   #06B6D4;
+  --color-accent-subtle:  #ECFEFF;
+  --color-accent-muted:   #CFFAFE;
+
+  --color-danger:         #EF4444;
+  --color-success:        #10B981;
+
+  --color-shadow-sm: rgba(0,0,0,0.04);
+  --color-shadow-md: rgba(0,0,0,0.06);
+  --color-shadow-lg: rgba(0,0,0,0.08);
+
+  /* 圆角 */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-full: 9999px;
+
+  /* 间距 */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
+  --space-2xl: 32px;
+
+  /* 字体 */
+  --font-sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 15px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* 阴影 */
+  --shadow-xs:  0 1px 2px  var(--color-shadow-sm);
+  --shadow-sm:  0 1px 3px  var(--color-shadow-sm), 0 1px 2px var(--color-shadow-md);
+  --shadow-md:  0 4px 12px var(--color-shadow-md), 0 1px 4px var(--color-shadow-sm);
+  --shadow-lg:  0 8px 24px var(--color-shadow-lg), 0 2px 8px var(--color-shadow-md);
+  --shadow-xl:  0 16px 48px var(--color-shadow-lg), 0 4px 16px var(--color-shadow-md);
+
+  /* 动画 */
+  --ease-spring:  cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out:     cubic-bezier(0.16, 0.84, 0.44, 1);
+  --ease-in:      cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  --ease-smooth:  cubic-bezier(0.4, 0, 0.2, 1);
+
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   400ms;
+  --duration-spring: 500ms;
+}
+
+/* ═══════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════
+   OVERLAY
+   ═══════════════════════════════════ */
+.overlay {
+  width: 480px;
+  max-height: 540px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+
+  transform: translateZ(0);
+  will-change: transform, opacity;
+
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition:
+    opacity var(--duration-spring) var(--ease-spring),
+    transform var(--duration-spring) var(--ease-spring);
+}
+
+.overlay.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ═══════════════════════════════════
+   INPUT AREA
+   ═══════════════════════════════════ */
+.input-area {
+  width: 100%;
+  min-height: 100px;
+  max-height: 240px;
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-lg);
+  outline: none;
+  resize: none;
+
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.7;
+  color: var(--color-text-primary);
+
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.input-area::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.input-area:focus {
+  background: #FFFFFF;
+  box-shadow:
+    0 0 0 3px var(--color-accent-subtle),
+    0 0 0 1px var(--color-accent-light);
+}
+
+/* ═══════════════════════════════════
+   ATTACHMENTS
+   ═══════════════════════════════════ */
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.attachments:empty {
+  display: none;
+}
+
+.attachment-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.attachment-thumb:hover {
+  transform: scale(1.05);
+}
+
+.attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-thumb.audio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.remove-attachment {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.45);
+  color: #FFF;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.attachment-thumb:hover .remove-attachment {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════
+   RECORDING BAR
+   ═══════════════════════════════════ */
+.recording-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: #FEF2F2;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+
+  transition:
+    opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.recording-bar.hidden {
+  display: none;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* ═══════════════════════════════════
+   HINT
+   ═══════════════════════════════════ */
+.hint {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════
+   SUBMIT BUTTON — 青色药丸
+   ═══════════════════════════════════ */
+.submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: var(--color-accent-light);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 12px rgba(8, 145, 178, 0.25),
+    0 2px 4px rgba(8, 145, 178, 0.12);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 50ms;
+}
+
+.submit-btn:disabled {
+  background: var(--color-surface);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
+.btn-arrow {
+  display: inline-block;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.submit-btn:hover:not(:disabled) .btn-arrow {
+  transform: translateX(3px);
+}
+
+.submit-btn.loading {
+  background: var(--color-accent-light);
+  pointer-events: none;
+}
