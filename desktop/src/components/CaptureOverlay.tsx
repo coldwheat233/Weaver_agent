@@ -33,7 +33,7 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recognitionRef = useRef<any>(null);
   const recordingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -82,28 +82,55 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
     }
   };
 
-  // ── 录音 ──
+  // ── 录音（Web Speech API 实时转写）──
   const toggleRecording = async () => {
     if (recording) {
-      mediaRecorderRef.current?.stop();
-      setRecording(false);
+      // 停止录音
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setRecording(false);
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        const chunks: BlobPart[] = [];
-        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-        mr.onstop = () => {
-          const blob = new Blob(chunks, { type: "audio/webm" });
-          setAttachments((prev) => [
-            ...prev,
-            { name: `recording-${Date.now()}.webm`, blob, type: "audio" },
-          ]);
-          stream.getTracks().forEach((t) => t.stop());
+        const SpeechRecognition =
+          (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          alert("浏览器不支持语音识别（需要 Edge 或 Chrome）");
+          return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = "zh-CN";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: any) => {
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          setContent((prev) => {
+            // 实时追加转写结果
+            const base = prev.replace(/\[🎤\s.*?\]\s*/g, "").trim();
+            return (base ? base + " " : "") + transcript;
+          });
         };
-        mr.start();
-        mediaRecorderRef.current = mr;
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech error:", event.error);
+          if (event.error === "no-speech" || event.error === "aborted") return;
+          setRecording(false);
+          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        };
+
+        recognition.onend = () => {
+          setRecording(false);
+          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
         setRecording(true);
         setRecordingTime(0);
         recordingTimerRef.current = window.setInterval(() => {
@@ -139,14 +166,14 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         await api.submitIdea(text, sid);
       }
 
-      // 上传附件（图片/音频）
+      // 上传图片附件
       for (const att of attachments) {
+        if (att.type !== "image") continue;
         const fd = new FormData();
         fd.append("file", att.blob, att.name);
-        fd.append("source_type", att.type === "image" ? "image" : "voice");
+        fd.append("source_type", "image");
         if (sid) fd.append("session_id", sid);
-        if (!text) fd.append("content", att.type === "audio" ? "(语音输入)" : "(图片输入)");
-
+        fd.append("content", "(图片输入)");
         try {
           await fetch(`${API}/api/ideas`, { method: "POST", body: fd });
         } catch (e) {
