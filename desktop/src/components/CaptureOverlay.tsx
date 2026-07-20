@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { api, InquisitorQuestion } from "../lib/api";
 
+const API = "http://localhost:8765";
+
 interface Props {
   sessionId: string;
   setSessionId: (id: string) => void;
@@ -8,13 +10,18 @@ interface Props {
   onClose: () => void;
 }
 
+interface Attachment {
+  name: string;
+  blob: Blob;
+  dataUrl?: string;
+  type: "image" | "audio";
+}
+
 async function startDrag() {
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().startDragging();
-  } catch {
-    /* 浏览器环境忽略 */
-  }
+  } catch {}
 }
 
 export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboard, onClose }: Props) {
@@ -22,36 +29,142 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [questions, setQuestions] = useState<InquisitorQuestion[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  // ── 剪贴板图片粘贴 ──
+  useEffect(() => {
+    const handler = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (blob) {
+            const dataUrl = await blobToDataUrl(blob);
+            setAttachments((prev) => [
+              ...prev,
+              { name: `clipboard-${Date.now()}.png`, blob, dataUrl, type: "image" },
+            ]);
+          }
+        }
+      }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, []);
+
+  // ── 拖拽上传 ──
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    for (const file of e.dataTransfer.files) {
+      if (file.type.startsWith("image/")) {
+        const dataUrl = await blobToDataUrl(file);
+        setAttachments((prev) => [
+          ...prev,
+          { name: file.name, blob: file, dataUrl, type: "image" },
+        ]);
+      } else if (file.type.startsWith("audio/")) {
+        setAttachments((prev) => [
+          ...prev,
+          { name: file.name, blob: file, type: "audio" },
+        ]);
+      }
+    }
+  };
+
+  // ── 录音 ──
+  const toggleRecording = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        const chunks: BlobPart[] = [];
+        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+        mr.onstop = () => {
+          const blob = new Blob(chunks, { type: "audio/webm" });
+          setAttachments((prev) => [
+            ...prev,
+            { name: `recording-${Date.now()}.webm`, blob, type: "audio" },
+          ]);
+          stream.getTracks().forEach((t) => t.stop());
+        };
+        mr.start();
+        mediaRecorderRef.current = mr;
+        setRecording(true);
+        setRecordingTime(0);
+        recordingTimerRef.current = window.setInterval(() => {
+          setRecordingTime((t) => t + 1);
+        }, 1000);
+      } catch (err) {
+        console.error("Mic access denied:", err);
+      }
+    }
+  };
+
+  const removeAttachment = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // ── 提交 ──
   const submit = async () => {
     const text = content.trim();
-    if (!text || submitting) return;
+    if (!text && attachments.length === 0) return;
+    if (submitting) return;
     setSubmitting(true);
 
     try {
-      // Ensure session
       let sid = sessionId;
-      if (!sid) {
+      if (!sid && text) {
         const s = await api.createSession(text.slice(0, 80));
         sid = s.session_id;
         setSessionId(sid);
       }
 
-      await api.submitIdea(text, sid);
+      // 提交文字
+      if (text) {
+        await api.submitIdea(text, sid);
+      }
+
+      // 上传附件（图片/音频）
+      for (const att of attachments) {
+        const fd = new FormData();
+        fd.append("file", att.blob, att.name);
+        fd.append("source_type", att.type === "image" ? "image" : "voice");
+        if (sid) fd.append("session_id", sid);
+        if (!text) fd.append("content", att.type === "audio" ? "(语音输入)" : "(图片输入)");
+
+        try {
+          await fetch(`${API}/api/ideas`, { method: "POST", body: fd });
+        } catch (e) {
+          console.error("Upload failed:", e);
+        }
+      }
+
       setContent("");
+      setAttachments([]);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 600);
 
-      // Check for V2 inquisitor questions
-      try {
-        const q = await api.checkInquisitor(sid);
-        if (q.questions?.length) setQuestions(q.questions.slice(0, 1));
-      } catch {}
+      if (sid) {
+        try {
+          const q = await api.checkInquisitor(sid);
+          if (q.questions?.length) setQuestions(q.questions.slice(0, 1));
+        } catch {}
+      }
 
       inputRef.current?.focus();
     } catch (e) {
@@ -76,6 +189,9 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
     }
   };
 
+  const formatTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
   return (
     <>
       {/* Title bar */}
@@ -84,58 +200,116 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
           <span className="titlebar-title">✦ 捕捉想法</span>
         </div>
         <div className="titlebar-actions" onMouseDown={(e) => e.stopPropagation()}>
+          <button className="titlebar-btn" onClick={toggleRecording} title={recording ? "停止录音" : "录音"}>
+            {recording ? "⏹" : "🎤"}
+          </button>
           <button className="titlebar-btn" onClick={onOpenDashboard} title="用户后台">
             ☰
           </button>
-          <button
-            className="titlebar-btn danger"
-            onClick={onClose}
-            title="关闭 (Esc)"
-          >
+          <button className="titlebar-btn danger" onClick={onClose} title="关闭 (Esc)">
             ✕
           </button>
         </div>
       </div>
 
-      {/* Input */}
-      <textarea
-        ref={inputRef}
-        className="input-area"
-        placeholder="写下你的想法……"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyDown={handleKeyDown}
-        autoFocus
-      />
+      {/* Drop zone */}
+      <div
+        onDrop={onDrop}
+        onDragOver={(e) => e.preventDefault()}
+        style={{ flex: 1, display: "flex", flexDirection: "column" }}
+      >
+        {/* Recording indicator */}
+        {recording && (
+          <div style={{
+            margin: "0 24px 8px", padding: "6px 14px",
+            background: "#FEF2F2", borderRadius: 999, fontSize: 12, color: "#EF4444",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: 999, background: "#EF4444",
+              animation: "pulse 1.2s infinite",
+            }} />
+            ● REC {formatTime(recordingTime)}
+          </div>
+        )}
 
-      {/* Inquiry panel (V2) */}
-      {questions.length > 0 && (
-        <div className="inquiry-panel">
-          <div className="inquiry-text">💡 {questions[0].question}</div>
-          <div className="inquiry-actions">
-            {["是", "否", "详细说说..."].map((a) => (
-              <button key={a} className="inquiry-btn" onClick={() => answerQuestion(a)}>
-                {a}
-              </button>
+        {/* Attachment thumbnails */}
+        {attachments.length > 0 && (
+          <div style={{ display: "flex", gap: 8, padding: "0 24px 8px", flexWrap: "wrap" }}>
+            {attachments.map((att, i) => (
+              <div key={i} style={{
+                position: "relative", width: 64, height: 64,
+                borderRadius: 12, overflow: "hidden", background: "#F3F3F5",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {att.dataUrl ? (
+                  <img src={att.dataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ fontSize: 24 }}>🎵</span>
+                )}
+                <button
+                  onClick={() => removeAttachment(i)}
+                  style={{
+                    position: "absolute", top: 2, right: 2, width: 18, height: 18,
+                    border: "none", borderRadius: 999, background: "rgba(0,0,0,0.4)",
+                    color: "#FFF", fontSize: 11, cursor: "pointer", lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Input */}
+        <textarea
+          ref={inputRef}
+          className="input-area"
+          placeholder="写下你的想法… 也可以 Ctrl+V 粘贴图片，拖拽文件到这里"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+        />
+
+        {/* Inquiry panel (V2) */}
+        {questions.length > 0 && (
+          <div className="inquiry-panel">
+            <div className="inquiry-text">💡 {questions[0].question}</div>
+            <div className="inquiry-actions">
+              {["是", "否", "详细说说..."].map((a) => (
+                <button key={a} className="inquiry-btn" onClick={() => answerQuestion(a)}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Hint */}
       <p className="hint">
-        Ctrl+↵ 提交 · {content.length} 字符
+        Ctrl+↵ 提交 · {content.length} 字符 · 🎤 录音 · Ctrl+V 粘贴图片
       </p>
 
       {/* Submit button */}
       <button
         className={`submit-btn ${success ? "success" : ""}`}
         onClick={submit}
-        disabled={!content.trim() || submitting}
+        disabled={(!content.trim() && attachments.length === 0) || submitting}
       >
         <span>{success ? "✓ 已捕捉" : submitting ? "捕捉中..." : "捕捉想法"}</span>
         {!success && !submitting && <span className="arrow">→</span>}
       </button>
     </>
   );
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
 }

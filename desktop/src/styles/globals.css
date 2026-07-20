@@ -202,3 +202,8 @@ html, body, #root {
 .action-btn.secondary:hover { background: var(--surface-hover); }
 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-tertiary); font-size: 13px; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.3; transform: scale(0.75); }
+}
