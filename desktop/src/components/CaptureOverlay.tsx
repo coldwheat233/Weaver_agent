@@ -105,15 +105,26 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         recognition.continuous = true;
         recognition.interimResults = true;
 
+        let lastFinalIdx = -1;
         recognition.onresult = (event: any) => {
-          let transcript = "";
+          let interim = "";
+          let finalPart = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+            const r = event.results[i];
+            if (r.isFinal && i > lastFinalIdx) {
+              finalPart += (finalPart ? " " : "") + r[0].transcript;
+              lastFinalIdx = i;
+            } else if (!r.isFinal) {
+              interim += r[0].transcript;
+            }
           }
           setContent((prev) => {
-            // 实时追加转写结果
-            const base = prev.replace(/\[🎤\s.*?\]\s*/g, "").trim();
-            return (base ? base + " " : "") + transcript;
+            // 去掉上次的暂态文本，保留已确认内容
+            const base = prev.replace(/\s*\(…\)\s*$/g, "").trim();
+            const newText = base
+              ? base + " " + finalPart
+              : finalPart;
+            return interim ? newText + (newText ? " " : "") + "(…)" : newText;
           });
         };
 
@@ -125,6 +136,7 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         };
 
         recognition.onend = () => {
+          setContent((prev) => prev.replace(/\s*\(…\)\s*/g, "").trim());
           setRecording(false);
           if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         };
