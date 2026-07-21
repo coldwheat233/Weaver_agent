@@ -32,6 +32,7 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const recordingTimerRef = useRef<number | null>(null);
@@ -196,7 +197,14 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
       setContent("");
       setAttachments([]);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 600);
+      setToast({ type: "ok", msg: "✓ 想法已捕捉" });
+      setTimeout(() => { setSuccess(false); setToast(null); }, 2000);
+
+      // 通知 Dashboard 刷新
+      try {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("idea-submitted", { sessionId: sid });
+      } catch {}
 
       if (sid) {
         try {
@@ -206,8 +214,9 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
       }
 
       inputRef.current?.focus();
-    } catch (e) {
-      console.error("Submit failed:", e);
+    } catch (e: any) {
+      setToast({ type: "err", msg: `✗ ${e?.message || "提交失败"}` });
+      setTimeout(() => setToast(null), 3000);
     } finally {
       setSubmitting(false);
     }
@@ -250,6 +259,19 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
           </button>
         </div>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          margin: "0 24px 0", padding: "8px 14px", borderRadius: 10, fontSize: 12,
+          background: toast.type === "ok" ? "#ECFDF5" : "#FEF2F2",
+          border: `1px solid ${toast.type === "ok" ? "#A7F3D0" : "#FECACA"}`,
+          color: toast.type === "ok" ? "#059669" : "#EF4444",
+          transition: "opacity 0.3s ease",
+        }}>
+          {toast.msg}
+        </div>
+      )}
 
       {/* Drop zone */}
       <div

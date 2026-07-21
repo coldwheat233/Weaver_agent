@@ -26,7 +26,15 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   const [loading, setLoading] = useState(true);
   const [needsConfig, setNeedsConfig] = useState(false);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    loadAll();
+    // 监听"想法提交"事件自动刷新
+    let unlisten: (() => void) | undefined;
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("idea-submitted", () => loadAll()).then((fn) => { unlisten = fn; });
+    }).catch(() => {});
+    return () => { unlisten?.(); };
+  }, []);
 
   const loadAll = async () => {
     setLoading(true);
@@ -103,20 +111,22 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           <span className="titlebar-title">☰ 用户后台</span>
         </div>
         <div className="titlebar-actions" onMouseDown={(e) => e.stopPropagation()}>
-          <button className="titlebar-btn" onClick={onOpenCapture} title="输入想法">
+          <button className="titlebar-btn" onClick={onOpenCapture} title="输入想法 (Ctrl+Alt+[)">
             ✏️
           </button>
           <button className="titlebar-btn" onClick={onOpenSettings} title="模型配置">
             ⚙
           </button>
-          <button
-            className="titlebar-btn"
-            onClick={() => openUrl("http://localhost:8765/dashboard")}
-            title="在浏览器中查看"
-          >
+          <button className="titlebar-btn" onClick={async () => {
+            try { const { getCurrentWindow } = await import("@tauri-apps/api/window");
+                  await getCurrentWindow().minimize(); } catch {}
+          }} title="最小化">
+            ─
+          </button>
+          <button className="titlebar-btn" onClick={() => openUrl("http://localhost:8765/dashboard")} title="在浏览器查看">
             🔗
           </button>
-          <button className="titlebar-btn danger" onClick={onClose} title="关闭 (Esc)">
+          <button className="titlebar-btn danger" onClick={onClose} title="隐藏 (Esc)">
             ✕
           </button>
         </div>
@@ -183,12 +193,6 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button className="action-btn primary" onClick={triggerWeave} disabled={weaving}>
             {weaving ? "编织中..." : "编织所有想法 →"}
-          </button>
-          <button
-            className="action-btn secondary"
-            onClick={() => openUrl("http://localhost:8765/dashboard")}
-          >
-            在浏览器查看
           </button>
         </div>
 
@@ -258,6 +262,11 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
             概念簇达到临界质量时将自动推送设计提案
           </div>
         )}
+
+        {/* 快捷键提示 */}
+        <div style={{ textAlign: "center", padding: "24px 0 8px", fontSize: 11, color: "#A0A0AC" }}>
+          Ctrl+Alt+[ 输入想法 · Ctrl+Alt+] 用户后台 · Esc 隐藏 · 左键托盘切换
+        </div>
       </div>
     </>
   );
