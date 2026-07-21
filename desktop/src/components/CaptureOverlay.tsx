@@ -33,7 +33,24 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const prompts = [
+    "你的微服务最大的性能瓶颈在哪里？",
+    "最近让你头疼的技术问题是什么？",
+    "如果要重构一个模块，你会从哪里开始？",
+    "有没有一个灵感突然闪过，还没来得及写下来？",
+    "你见过的最优雅的架构设计是什么样的？",
+    "现在做的项目里，哪个决策让你最纠结？",
+    "说说你最近学到的一个新概念…",
+    "如果资源不限，你的系统会怎么设计？",
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => setPlaceholderIdx((i) => (i + 1) % prompts.length), 4000);
+    return () => clearInterval(timer);
+  }, []);
   const recognitionRef = useRef<any>(null);
   const recordingTimerRef = useRef<number | null>(null);
 
@@ -327,7 +344,7 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         <textarea
           ref={inputRef}
           className="input-area"
-          placeholder="写下你的想法… 也可以 Ctrl+V 粘贴图片，拖拽文件到这里"
+          placeholder={prompts[placeholderIdx]}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}

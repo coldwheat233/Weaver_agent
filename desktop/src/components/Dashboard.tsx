@@ -191,10 +191,20 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         </div>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
           <button className="action-btn primary" onClick={triggerWeave} disabled={weaving}>
-            {weaving ? "编织中..." : "编织所有想法 →"}
+            {weaving ? "编织中..." : ideas.length > 0 ? `编织 ${ideas.length} 条想法 →` : "编织所有想法 →"}
           </button>
+          {designs.length > 0 && (
+            <span style={{ fontSize: 12, color: "#10B981", fontWeight: 500 }}>
+              ✓ {designs.length} 份设计成果
+            </span>
+          )}
+          {ideas.length > 0 && designs.length === 0 && !weaving && (
+            <span style={{ fontSize: 12, color: "#F59E0B", fontWeight: 500 }}>
+              {ideas.length} 条想法待编织
+            </span>
+          )}
         </div>
 
         {/* Tab 导航 (文字按钮) */}
@@ -210,7 +220,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
               style={{
                 padding: "8px 20px", border: "none", borderBottom: tab === t.key ? "2px solid #0891B2" : "2px solid transparent",
                 background: "transparent", color: tab === t.key ? "#0891B2" : "#6E6E7C",
-                fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
+                fontSize: 13, fontWeight: 600,
                 cursor: "pointer", fontFamily: "inherit",
                 transition: "all 120ms ease",
               }}
@@ -220,7 +230,8 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           ))}
         </div>
 
-        {/* Tab: 想法 */}
+        {/* Tab content (固定最小高度防抖动) */}
+        <div style={{ minHeight: 280 }}>
         {tab === "ideas" && (
           <>
             {ideas.slice(-10).reverse().map((i) => (
@@ -274,6 +285,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
             )}
           </>
         )}
+        </div>
 
         {/* 快捷键提示 */}
         <div style={{ textAlign: "center", padding: "24px 0 8px", fontSize: 11, color: "#A0A0AC" }}>
