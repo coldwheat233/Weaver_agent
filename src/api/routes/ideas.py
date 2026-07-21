@@ -82,6 +82,9 @@ async def submit_idea(
             from uuid import UUID as _UUID
             await SessionRepo(db).add_idea(session_id, node.id)
 
+        # Q7: 更新用户画像 (学习思维模式)
+        await _update_user_profile(db, node)
+
     logger.info(f"Idea submitted: {node.id} session={session_id}")
 
     return {
@@ -90,6 +93,60 @@ async def submit_idea(
         "intent_tags": [t.value for t in node.intent_tags],
         "status": node.status.value,
     }
+
+
+async def _update_user_profile(db, node):
+    """Q7: 每次提交想法时更新用户画像"""
+    import json
+    from sqlalchemy import text
+
+    # 读取当前 profile
+    result = await db.execute(text("SELECT * FROM user_profile WHERE id = 1"))
+    row = result.fetchone()
+    if not row: return
+    r = dict(row._mapping)
+
+    # 更新 interaction_count
+    count = r.get("interaction_count", 0) + 1
+
+    # 更新 frequent_domains (最近 50 条想法的 context_tags 统计)
+    domains = json.loads(r.get("frequent_domains", "[]"))
+    for tag in node.context_tags:
+        if tag not in domains:
+            domains.append(tag)
+    domains = domains[-30:]  # 保留最近 30 个唯一 domain
+
+    # 更新 idea_transition_matrix (domain → domain 计数的 Markov 链)
+    matrix = json.loads(r.get("idea_transition_matrix", "{}"))
+    tags = node.context_tags[:3]
+    for i in range(len(tags)):
+        for j in range(i + 1, len(tags)):
+            key = f"{tags[i]}→{tags[j]}"
+            matrix[key] = matrix.get(key, 0) + 1
+
+    # 更新 recurring_constraints (检测包含 "必须" / "不能" / "需要" 的想法)
+    constraints = json.loads(r.get("recurring_constraints", "[]"))
+    content = node.standardized_content or node.raw_content
+    for kw in ["必须", "不能", "需要", "要求", "保证", "确保"]:
+        if kw in content and content not in constraints:
+            constraints.append(content[:120])
+    constraints = constraints[-10:]
+
+    await db.execute(text("""
+        UPDATE user_profile SET
+            frequent_domains = :domains,
+            idea_transition_matrix = :matrix,
+            recurring_constraints = :constraints,
+            interaction_count = :count,
+            last_updated = datetime('now')
+        WHERE id = 1
+    """), {
+        "domains": json.dumps(domains, ensure_ascii=False),
+        "matrix": json.dumps(matrix, ensure_ascii=False),
+        "constraints": json.dumps(constraints, ensure_ascii=False),
+        "count": count,
+    })
+    await db.commit()
 
 
 @router.get("")

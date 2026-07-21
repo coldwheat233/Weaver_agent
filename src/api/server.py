@@ -103,7 +103,7 @@ async def js_results():
     return HTMLResponse(_read_static("results.js"), media_type="application/javascript")
 
 # ── 路由注册 ──
-from src.api.routes import ideas, sessions, weaving, designs, health, assets, v2_dialogue, v3_autonomy, debug, config  # noqa: E402
+from src.api.routes import ideas, sessions, weaving, designs, health, assets, v2_dialogue, v3_autonomy, debug, config, feedback  # noqa: E402
 
 app.include_router(health.router)
 app.include_router(ideas.router)
@@ -115,3 +115,4 @@ app.include_router(v2_dialogue.router)
 app.include_router(v3_autonomy.router)
 app.include_router(debug.router)
 app.include_router(config.router)
+app.include_router(feedback.router)

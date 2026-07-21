@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, IdeaNode, DesignDoc, V3Proposal } from "../lib/api";
 
 interface Props {
@@ -25,7 +25,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   const [backendError, setBackendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsConfig, setNeedsConfig] = useState(false);
-  const [tab, setTab] = useState<"ideas" | "designs" | "v3">("ideas");
+  const [tab, setTab] = useState<"ideas" | "graph" | "designs" | "v3">("ideas");
 
   useEffect(() => {
     loadAll();
@@ -211,6 +211,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #E5E5E8", marginBottom: 12 }}>
           {[
             { key: "ideas", label: `想法 · ${ideas.length}` },
+            { key: "graph", label: "图谱" },
             { key: "designs", label: `设计 · ${designs.length}` },
             { key: "v3", label: `V3 · ${proposals.length}` },
           ].map((t) => (
@@ -269,6 +270,18 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           </>
         )}
 
+        {/* Tab: 图谱 */}
+        {tab === "graph" && (
+          <div style={{ width: "100%", height: 320, background: "#FFF", borderRadius: 14, overflow: "hidden", position: "relative" }}>
+            <GraphView ideas={ideas} />
+            {ideas.length === 0 && (
+              <div className="empty-state" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                还没有想法，提交后这里会呈现关联图谱
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tab: V3 */}
         {tab === "v3" && (
           <>
@@ -294,4 +307,171 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
       </div>
     </>
   );
+}
+
+// ═══ 力导向图谱组件 (拖动 + 缩放 + 簇细节) ═══
+const COLORS = ["#0891B2", "#06B6D4", "#0D9488", "#6366F1", "#8B5CF6", "#EC4899", "#F59E0B"];
+const NODE_R = 10;
+
+function GraphView({ ideas }: { ideas: IdeaNode[] }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ideas.length === 0 || !svgRef.current) return;
+    const svg = svgRef.current;
+    const el = containerRef.current!;
+    const W = el.clientWidth || 560;
+    const H = 320;
+
+    // 状态
+    interface GNode { id: string; x: number; y: number; vx: number; vy: number; label: string; full: string; tags: string; r: number; color: string; fx?: number; fy?: number; }
+    const nodes: GNode[] = ideas.slice(0, 20).map((i) => ({
+      id: i.id,
+      x: W / 2 + (Math.random() - 0.5) * W * 0.4,
+      y: H / 2 + (Math.random() - 0.5) * H * 0.4,
+      vx: 0, vy: 0,
+      label: (i.standardized_content || i.raw_content || "").slice(0, 18),
+      full: i.standardized_content || i.raw_content || "",
+      tags: [...(i.intent_tags || []), ...(i.context_tags || [])].slice(0, 4).join(" · "),
+      r: NODE_R + (i.context_tags?.length || 0) * 1.5,
+      color: COLORS[(i.context_tags || []).length % COLORS.length],
+    }));
+
+    const edges: [number, number, number][] = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const iTags = new Set(ideas[i]?.context_tags || []);
+      for (let j = i + 1; j < nodes.length; j++) {
+        const shared = (ideas[j]?.context_tags || []).filter((t) => iTags.has(t)).length;
+        if (shared > 0) edges.push([i, j, 0.5 + shared * 0.15]);
+        else if (Math.random() < 0.06) edges.push([i, j, 0.15]);
+      }
+    }
+
+    // 缩放 + 平移
+    let scale = 1, tx = 0, ty = 0;
+    let dragging: number | null = null;
+    let dragOX = 0, dragOY = 0;
+    let tooltipNode: GNode | null = null;
+
+    // 渲染 (Canvas-like approach: direct DOM manipulation)
+    const render = () => {
+      let html = `<g transform="translate(${tx},${ty}) scale(${scale})">`;
+      // 边
+      for (const [a, b, s] of edges) {
+        html += `<line x1="${nodes[a].x}" y1="${nodes[a].y}" x2="${nodes[b].x}" y2="${nodes[b].y}" stroke="#E5E5E8" stroke-width="${1 + s * 2}" opacity="0.5" style="pointer-events:none"/>`;
+      }
+      // 节点
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        html += `<g class="graph-node" data-idx="${i}" style="cursor:grab">
+          <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.color}" opacity="0.9" stroke="#FFF" stroke-width="1.5"/>
+          <text x="${n.x}" y="${n.y - n.r - 5}" text-anchor="middle" font-size="10" fill="#6E6E7C" style="pointer-events:none">${n.label}</text>
+        </g>`;
+      }
+      html += `</g>`;
+      svg.innerHTML = html;
+
+      // 绑定事件
+      svg.querySelectorAll(".graph-node").forEach((g) => {
+        const idx = parseInt(g.getAttribute("data-idx") || "-1");
+        const n = nodes[idx];
+        if (!n) return;
+        g.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          dragging = idx;
+          const me = e as MouseEvent;
+          dragOX = me.clientX - (n.fx ?? n.x);
+          dragOY = me.clientY - (n.fy ?? n.y);
+          n.fx = n.x; n.fy = n.y;
+          (e.target as HTMLElement).style.cursor = "grabbing";
+        });
+        g.addEventListener("click", () => {
+          if (dragging === null) {
+            tooltipNode = tooltipNode?.id === n.id ? null : n;
+          }
+        });
+      });
+
+      // Tooltip
+      let tipHtml = "";
+      if (tooltipNode) {
+        tipHtml = `<foreignObject x="${tx + tooltipNode.x * scale + 16}" y="${ty + tooltipNode.y * scale - 30}" width="200" height="80">
+          <div style="background:#FFF;border-radius:10px;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);font-size:11px;line-height:1.5;color:#1A1A2E;">
+            <div style="font-weight:600;margin-bottom:4px;color:#0891B2">${tooltipNode.full.slice(0, 80)}</div>
+            <div style="color:#6E6E7C;font-size:10px">${tooltipNode.tags}</div>
+          </div>
+        </foreignObject>`;
+      }
+      svg.innerHTML += tipHtml;
+    };
+
+    // 拖动/缩放事件
+    el.onmousedown = (e) => {
+      if (dragging === null) {
+        dragOX = e.clientX - tx; dragOY = e.clientY - ty;
+        el.style.cursor = "grabbing";
+      }
+    };
+    window.addEventListener("mousemove", (e) => {
+      if (dragging !== null) {
+        const n = nodes[dragging];
+        n.fx = e.clientX - dragOX;
+        n.fy = e.clientY - dragOY;
+        n.x = n.fx; n.y = n.fy; n.vx = 0; n.vy = 0;
+      } else if (el.style.cursor === "grabbing") {
+        tx = e.clientX - dragOX; ty = e.clientY - dragOY;
+      }
+    });
+    window.addEventListener("mouseup", () => {
+      dragging = null;
+      el.style.cursor = "default";
+    });
+    el.onwheel = (e) => {
+      e.preventDefault();
+      const ds = e.deltaY > 0 ? 0.9 : 1.1;
+      scale = Math.max(0.3, Math.min(3, scale * ds));
+    };
+
+    // 物理 tick
+    let settled = 0;
+    function tick() {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].fx !== undefined) continue;
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (nodes[j].fx !== undefined) continue;
+          const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+          const d = Math.sqrt(dx * dx + dy * dy) || 1;
+          const f = 800 / (d * d);
+          nodes[i].vx -= (dx / d) * f; nodes[i].vy -= (dy / d) * f;
+          nodes[j].vx += (dx / d) * f; nodes[j].vy += (dy / d) * f;
+        }
+      }
+      for (const [a, b, s] of edges) {
+        const dx = nodes[b].x - nodes[a].x, dy = nodes[b].y - nodes[a].y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const f = (d - 60) * 0.005 * s;
+        if (nodes[a].fx === undefined) { nodes[a].vx += (dx / d) * f; nodes[a].vy += (dy / d) * f; }
+        if (nodes[b].fx === undefined) { nodes[b].vx -= (dx / d) * f; nodes[b].vy -= (dy / d) * f; }
+      }
+      let maxMove = 0;
+      for (const n of nodes) {
+        if (n.fx !== undefined) { n.vx = 0; n.vy = 0; continue; }
+        n.vx += (W / 2 - n.x) * 0.001; n.vy += (H / 2 - n.y) * 0.001;
+        n.vx *= 0.85; n.vy *= 0.85;
+        n.x = Math.max(NODE_R, Math.min(W - NODE_R, n.x + n.vx));
+        n.y = Math.max(NODE_R, Math.min(H - NODE_R, n.y + n.vy));
+        maxMove = Math.max(maxMove, Math.abs(n.vx), Math.abs(n.vy));
+      }
+      if (maxMove < 0.05) settled++; else settled = 0;
+      render();
+      if (settled < 30) requestAnimationFrame(tick);
+    }
+    tick();
+    return () => { settled = 99; };
+  }, [ideas]);
+
+  return <div ref={containerRef} style={{ width: "100%", height: 320 }}>
+    <svg ref={svgRef} width="100%" height="320" style={{ background: "#FCFCFD", borderRadius: 14 }} />
+  </div>;
 }
