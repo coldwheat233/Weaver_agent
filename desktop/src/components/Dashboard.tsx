@@ -26,6 +26,9 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   const [loading, setLoading] = useState(true);
   const [needsConfig, setNeedsConfig] = useState(false);
   const [tab, setTab] = useState<"ideas" | "graph" | "designs" | "v3">("ideas");
+  const [ideaPage, setIdeaPage] = useState(1);
+  const [designPage, setDesignPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     loadAll();
@@ -235,7 +238,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         <div style={{ minHeight: 280 }}>
         {tab === "ideas" && (
           <>
-            {ideas.slice(-10).reverse().map((i) => (
+            {ideas.slice(-(ideaPage * PAGE_SIZE)).reverse().slice(0, PAGE_SIZE).map((i) => (
               <div key={i.id} className="card">
                 <div className="card-title">
                   {(i.standardized_content || i.raw_content || "").slice(0, 100)}
@@ -245,6 +248,12 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
                 </div>
               </div>
             ))}
+            {ideas.length > ideaPage * PAGE_SIZE && (
+              <button onClick={() => setIdeaPage((p) => p + 1)}
+                style={{ width:"100%", padding:8, border:"none", borderRadius:10, background:"#F3F3F5", color:"#6E6E7C", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                加载更多 ({ideas.length - ideaPage * PAGE_SIZE} 条剩余)
+              </button>
+            )}
             {ideas.length === 0 && (
               <div className="empty-state">还没有想法。按 Ctrl+Alt+[ 开始捕捉</div>
             )}
@@ -254,7 +263,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         {/* Tab: 设计 */}
         {tab === "designs" && (
           <>
-            {designs.slice(-8).reverse().map((d) => (
+            {designs.slice(-(designPage * PAGE_SIZE)).reverse().slice(0, PAGE_SIZE).map((d) => (
               <div key={d.design_id} className="card" onClick={() => openDesign(d.design_id)}>
                 <div className="card-title">{(d.title || "未命名").slice(0, 60)}</div>
                 <div className="card-scores">
@@ -264,6 +273,12 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
                 </div>
               </div>
             ))}
+            {designs.length > designPage * PAGE_SIZE && (
+              <button onClick={() => setDesignPage((p) => p + 1)}
+                style={{ width:"100%", padding:8, border:"none", borderRadius:10, background:"#F3F3F5", color:"#6E6E7C", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                加载更多 ({designs.length - designPage * PAGE_SIZE} 条剩余)
+              </button>
+            )}
             {designs.length === 0 && (
               <div className="empty-state">提交想法后点击「编织所有想法」生成设计</div>
             )}
