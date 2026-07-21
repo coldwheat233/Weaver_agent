@@ -87,27 +87,13 @@ fn start_python_backend() -> Option<Child> {
 }
 
 fn main() {
-    // 单实例检测：已有后端在跑 → 不再 spawn，只负责显示窗口
-    let already_running = port_in_use(8765);
-    let backend = if already_running {
-        println!("Backend already running on :8765, skipping spawn");
-        None
-    } else {
-        start_python_backend()
-    };
+    let backend = start_python_backend();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .manage(PythonBackend(Mutex::new(backend)))
         .setup(|app| {
-            // 如果后端已运行，直接显示 dashboard（用户双击图标时）
-            if already_running {
-                if let Some(w) = app.get_webview_window("dashboard") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
-            }
             let handle = app.handle().clone();
 
             // ── Global Shortcuts ──
@@ -162,10 +148,19 @@ fn main() {
                         }
                     }
                     "quit" => {
-                        // 杀所有 weaver-backend 进程
-                        let _ = Command::new("taskkill")
-                            .args(["/F", "/IM", "weaver-backend.exe"])
-                            .output();
+                        // 无窗口杀后端进程 (CREATE_NO_WINDOW = 0x08000000)
+                        #[cfg(windows)]
+                        {
+                            use std::os::windows::process::CommandExt;
+                            let _ = Command::new("taskkill")
+                                .args(["/F", "/IM", "weaver-backend.exe"])
+                                .creation_flags(0x08000000)
+                                .output();
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            let _ = Command::new("pkill").arg("-f").arg("weaver-backend").output();
+                        }
                         app.exit(0);
                     }
                     _ => {}

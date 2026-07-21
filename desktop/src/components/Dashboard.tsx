@@ -25,6 +25,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   const [backendError, setBackendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsConfig, setNeedsConfig] = useState(false);
+  const [tab, setTab] = useState<"ideas" | "designs" | "v3">("ideas");
 
   useEffect(() => {
     loadAll();
@@ -196,71 +197,82 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           </button>
         </div>
 
-        {/* Recent Ideas */}
-        <div className="section-header">
-          <span className="section-title">📝 最近想法</span>
-          <span className="section-count">{ideas.length} 条</span>
+        {/* Tab 导航 (文字按钮) */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #E5E5E8", marginBottom: 12 }}>
+          {[
+            { key: "ideas", label: `想法 · ${ideas.length}` },
+            { key: "designs", label: `设计 · ${designs.length}` },
+            { key: "v3", label: `V3 · ${proposals.length}` },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key as any)}
+              style={{
+                padding: "8px 20px", border: "none", borderBottom: tab === t.key ? "2px solid #0891B2" : "2px solid transparent",
+                background: "transparent", color: tab === t.key ? "#0891B2" : "#6E6E7C",
+                fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
+                cursor: "pointer", fontFamily: "inherit",
+                transition: "all 120ms ease",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-        {ideas.slice(-10).reverse().map((i) => (
-          <div key={i.id} className="card">
-            <div className="card-title">
-              {(i.standardized_content || i.raw_content || "").slice(0, 100)}
-            </div>
-            <div className="card-subtitle">
-              {(i.intent_tags || []).slice(0, 3).join(" · ")} · {(i.context_tags || []).slice(0, 3).join(", ")}
-            </div>
-          </div>
-        ))}
-        {ideas.length === 0 && (
-          <div className="empty-state">
-            还没有想法。按 Ctrl+Alt+[ 开始捕捉
-          </div>
+
+        {/* Tab: 想法 */}
+        {tab === "ideas" && (
+          <>
+            {ideas.slice(-10).reverse().map((i) => (
+              <div key={i.id} className="card">
+                <div className="card-title">
+                  {(i.standardized_content || i.raw_content || "").slice(0, 100)}
+                </div>
+                <div className="card-subtitle">
+                  {(i.intent_tags || []).slice(0, 3).join(" · ")} · {(i.context_tags || []).slice(0, 3).join(", ")}
+                </div>
+              </div>
+            ))}
+            {ideas.length === 0 && (
+              <div className="empty-state">还没有想法。按 Ctrl+Alt+[ 开始捕捉</div>
+            )}
+          </>
         )}
 
-        {/* Recent Designs */}
-        <div className="section-header">
-          <span className="section-title">🏗 编织成果</span>
-          <span className="section-count">{designs.length} 份</span>
-        </div>
-        {designs.slice(-8).reverse().map((d) => (
-          <div key={d.design_id} className="card" onClick={() => openDesign(d.design_id)}>
-            <div className="card-title">{(d.title || "未命名").slice(0, 60)}</div>
-            <div className="card-scores">
-              <div className="card-score">
-                创新 <span>{d.innovation_score?.toFixed(2)}</span>
+        {/* Tab: 设计 */}
+        {tab === "designs" && (
+          <>
+            {designs.slice(-8).reverse().map((d) => (
+              <div key={d.design_id} className="card" onClick={() => openDesign(d.design_id)}>
+                <div className="card-title">{(d.title || "未命名").slice(0, 60)}</div>
+                <div className="card-scores">
+                  <div className="card-score">创新 <span>{d.innovation_score?.toFixed(2)}</span></div>
+                  <div className="card-score">自洽 <span>{d.coherence_score?.toFixed(2)}</span></div>
+                  <div className="card-score">可行 <span>{d.feasibility_score?.toFixed(2)}</span></div>
+                </div>
               </div>
-              <div className="card-score">
-                自洽 <span>{d.coherence_score?.toFixed(2)}</span>
-              </div>
-              <div className="card-score">
-                可行 <span>{d.feasibility_score?.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-        {designs.length === 0 && (
-          <div className="empty-state">
-            提交想法后点击「编织所有想法」生成设计
-          </div>
+            ))}
+            {designs.length === 0 && (
+              <div className="empty-state">提交想法后点击「编织所有想法」生成设计</div>
+            )}
+          </>
         )}
 
-        {/* V3 Proposals */}
-        <div className="section-header">
-          <span className="section-title">🔄 V3 自治演进</span>
-          <span className="section-count">{proposals.length} 个提案</span>
-        </div>
-        {proposals.slice(0, 5).map((p, i) => (
-          <div key={i} className="card">
-            <div className="card-title">{p.cluster_name}</div>
-            <div className="card-subtitle">
-              {p.node_count} 想法 · {p.cross_domains} 领域 · {p.status}
-            </div>
-          </div>
-        ))}
-        {proposals.length === 0 && (
-          <div className="empty-state">
-            概念簇达到临界质量时将自动推送设计提案
-          </div>
+        {/* Tab: V3 */}
+        {tab === "v3" && (
+          <>
+            {proposals.slice(0, 5).map((p, i) => (
+              <div key={i} className="card">
+                <div className="card-title">{p.cluster_name}</div>
+                <div className="card-subtitle">
+                  {p.node_count} 想法 · {p.cross_domains} 领域 · {p.status}
+                </div>
+              </div>
+            ))}
+            {proposals.length === 0 && (
+              <div className="empty-state">概念簇达到临界质量时将自动推送设计提案</div>
+            )}
+          </>
         )}
 
         {/* 快捷键提示 */}
