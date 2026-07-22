@@ -17,18 +17,13 @@ CACHE_PATH = user_data_root() / "tech_news_cache.json"
 SOURCES = [
     {
         "name": "Hacker News",
-        "url": "https://hnrss.org/frontpage?count=6",
+        "url": "https://hnrss.org/frontpage?count=5",
         "type": "rss",
     },
     {
-        "name": "Dev.to",
-        "url": "https://dev.to/feed/tag/programming",
-        "type": "rss",
-    },
-    {
-        "name": "GitHub Trending",
-        "url": "https://github.com/trending?since=daily",
-        "type": "html",
+        "name": "GitHub 热门",
+        "url": "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-07-14&sort=stars&order=desc&per_page=5",
+        "type": "github",
     },
 ]
 
@@ -74,22 +69,22 @@ async def _fetch_rss(url: str, limit: int = 5) -> list[dict]:
         return [{"title": f"抓取失败: {str(e)[:80]}", "link": "", "description": ""}]
 
 
-async def _scrape_github_trending(url: str) -> list[dict]:
-    """抓取 GitHub Trending 页面"""
+async def _fetch_github_api(url: str) -> list[dict]:
+    """GitHub API 搜索热门仓库 (结构化 JSON, 可靠)"""
     try:
-        import re
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url, headers={"User-Agent": "IdeaWeaver/1.0"})
+            resp = await client.get(url, headers={
+                "User-Agent": "IdeaWeaver/1.0",
+                "Accept": "application/vnd.github.v3+json",
+            })
             resp.raise_for_status()
-        # 提取 repo 名称
-        repos = re.findall(r'/trending/[^"]+?/([^/"]+)"', resp.text)
-        descs = re.findall(r'<p class="col-9 color-fg-muted my-1 pr-4">\s*(.+?)\s*</p>', resp.text, re.DOTALL)
+        data = resp.json()
         items = []
-        for i in range(min(5, len(repos))):
+        for repo in data.get("items", [])[:5]:
             items.append({
-                "title": f"🔥 {repos[i]}",
-                "link": f"https://github.com/{repos[i]}" if "/" not in repos[i] else f"https://github.com/trending/{repos[i]}",
-                "description": descs[i].strip() if i < len(descs) else "",
+                "title": f"⭐ {repo['full_name']} ({repo['stargazers_count']} stars)",
+                "link": repo["html_url"],
+                "description": (repo.get("description") or "")[:200],
             })
         return items
     except Exception as e:
@@ -110,8 +105,8 @@ async def get_tech_news():
             for item in items:
                 item["source"] = src["name"]
             all_items.extend(items)
-        elif src["type"] == "html":
-            items = await _scrape_github_trending(src["url"])
+        elif src["type"] == "github":
+            items = await _fetch_github_api(src["url"])
             for item in items:
                 item["source"] = src["name"]
             all_items.extend(items)
