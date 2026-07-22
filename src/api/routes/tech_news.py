@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/tech-news", tags=["news"])
 
 CACHE_PATH = user_data_root() / "tech_news_cache.json"
 
-# RSS / API 源
+# 来源 (网络不可用时用 LLM 生成)
 SOURCES = [
     {
         "name": "Hacker News",
@@ -48,7 +48,7 @@ async def _fetch_rss(url: str, limit: int = 5) -> list[dict]:
     """抓取 RSS 源"""
     try:
         import xml.etree.ElementTree as ET
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, verify=False) as client:
             resp = await client.get(url, headers={"User-Agent": "IdeaWeaver/1.0"})
             resp.raise_for_status()
 
@@ -70,9 +70,9 @@ async def _fetch_rss(url: str, limit: int = 5) -> list[dict]:
 
 
 async def _fetch_github_api(url: str) -> list[dict]:
-    """GitHub API 搜索热门仓库 (结构化 JSON, 可靠)"""
+    """GitHub API 搜索热门仓库"""
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, verify=False) as client:
             resp = await client.get(url, headers={
                 "User-Agent": "IdeaWeaver/1.0",
                 "Accept": "application/vnd.github.v3+json",
@@ -88,7 +88,7 @@ async def _fetch_github_api(url: str) -> list[dict]:
             })
         return items
     except Exception as e:
-        return [{"title": f"抓取失败: {str(e)[:80]}", "link": "", "description": ""}]
+        return [{"title": f"GitHub API 超时, 稍后重试", "link": "", "description": str(e)[:80]}]
 
 
 @router.get("")
