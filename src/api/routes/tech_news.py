@@ -13,21 +13,21 @@ router = APIRouter(prefix="/api/tech-news", tags=["news"])
 
 CACHE_PATH = user_data_root() / "tech_news_cache.json"
 
-# RSS 源
+# RSS / API 源
 SOURCES = [
     {
         "name": "Hacker News",
-        "url": "https://hnrss.org/frontpage?count=8",
+        "url": "https://hnrss.org/frontpage?count=6",
         "type": "rss",
     },
     {
-        "name": "Reddit r/programming",
-        "url": "https://www.reddit.com/r/programming/.rss",
+        "name": "Dev.to",
+        "url": "https://dev.to/feed/tag/programming",
         "type": "rss",
     },
     {
         "name": "GitHub Trending",
-        "url": "https://github.com/trending/python?since=daily",
+        "url": "https://github.com/trending?since=daily",
         "type": "html",
     },
 ]

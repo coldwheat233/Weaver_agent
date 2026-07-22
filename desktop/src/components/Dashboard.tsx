@@ -358,21 +358,30 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         {/* Tab: 资讯 */}
         {tab === "news" && (
           <>
-            {newsItems.map((item: any, i: number) => (
-              <div key={i} className="card" onClick={async () => {
-                try {
-                  const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(item),
-                  });
-                  if (r.ok) {
-                    setToastMsg(`✓ 已捕捉: ${item.title?.slice(0, 30)}`);
+            {newsItems.filter((item: any) => !item.title?.startsWith("抓取失败")).map((item: any, i: number) => (
+              <div key={i} className="card" style={{ transition: "opacity 0.2s" }}
+                onClick={async function(this: HTMLDivElement) {
+                  this.style.opacity = "0.5";
+                  try {
+                    const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(item),
+                    });
+                    if (r.ok) {
+                      const d = await r.json();
+                      setToastMsg(`✓ 已捕捉: ${d.title?.slice(0, 30) || item.title?.slice(0, 30)}`);
+                      setTimeout(() => setToastMsg(null), 2000);
+                      loadAll();
+                    } else {
+                      setToastMsg("✗ 捕捉失败");
+                      setTimeout(() => setToastMsg(null), 2000);
+                    }
+                  } catch {
+                    setToastMsg("✗ 网络错误");
                     setTimeout(() => setToastMsg(null), 2000);
-                    loadAll();
                   }
-                } catch {}
-              }}>
+                  this.style.opacity = "1";
+                }}>
                 <div className="card-title">{item.title?.slice(0, 100)}</div>
                 <div className="card-subtitle">
                   {item.source} · {item.description?.slice(0, 80)}
