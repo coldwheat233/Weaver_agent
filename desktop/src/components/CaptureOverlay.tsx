@@ -103,9 +103,10 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   // ── 录音（Web Speech API 实时转写）──
   const toggleRecording = async () => {
     if (recording) {
-      // 停止录音
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        if (typeof recognitionRef.current.stop === "function") {
+          recognitionRef.current.stop();
+        }
         recognitionRef.current = null;
       }
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
@@ -114,53 +115,61 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
       try {
         const SpeechRecognition =
           (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-          alert("浏览器不支持语音识别（需要 Edge 或 Chrome）");
-          return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = "zh-CN";
-        recognition.continuous = true;
-        recognition.interimResults = true;
+        if (SpeechRecognition) {
+          // 优先: Web Speech API 实时转写
+          const recognition = new SpeechRecognition();
+          recognition.lang = "zh-CN";
+          recognition.continuous = true;
+          recognition.interimResults = true;
 
-        let lastFinalIdx = -1;
-        recognition.onresult = (event: any) => {
-          let interim = "";
-          let finalPart = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const r = event.results[i];
-            if (r.isFinal && i > lastFinalIdx) {
-              finalPart += (finalPart ? " " : "") + r[0].transcript;
-              lastFinalIdx = i;
-            } else if (!r.isFinal) {
-              interim += r[0].transcript;
+          let lastFinalIdx = -1;
+          recognition.onresult = (event: any) => {
+            let interim = "";
+            let finalPart = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const r = event.results[i];
+              if (r.isFinal && i > lastFinalIdx) {
+                finalPart += (finalPart ? " " : "") + r[0].transcript;
+                lastFinalIdx = i;
+              } else if (!r.isFinal) {
+                interim += r[0].transcript;
+              }
             }
-          }
-          setContent((prev) => {
-            // 去掉上次的暂态文本，保留已确认内容
-            const base = prev.replace(/\s*\(…\)\s*$/g, "").trim();
-            const newText = base
-              ? base + " " + finalPart
-              : finalPart;
-            return interim ? newText + (newText ? " " : "") + "(…)" : newText;
-          });
-        };
+            setContent((prev) => {
+              const base = prev.replace(/\s*\(…\)\s*$/g, "").trim();
+              const newText = base ? base + " " + finalPart : finalPart;
+              return interim ? newText + (newText ? " " : "") + "(…)" : newText;
+            });
+          };
 
-        recognition.onerror = (event: any) => {
-          console.error("Speech error:", event.error);
-          if (event.error === "no-speech" || event.error === "aborted") return;
-          setRecording(false);
-          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-        };
+          recognition.onerror = (event: any) => {
+            if (event.error === "no-speech" || event.error === "aborted") return;
+            setRecording(false);
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          };
 
-        recognition.onend = () => {
-          setContent((prev) => prev.replace(/\s*\(…\)\s*/g, "").trim());
-          setRecording(false);
-          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-        };
+          recognition.onend = () => {
+            setContent((prev) => prev.replace(/\s*\(…\)\s*/g, "").trim());
+            setRecording(false);
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          };
 
-        recognition.start();
-        recognitionRef.current = recognition;
+          recognition.start();
+          recognitionRef.current = recognition;
+        } else {
+          // 降级: MediaRecorder 录制成文件
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+          const chunks: BlobPart[] = [];
+          mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+          mr.onstop = () => {
+            const blob = new Blob(chunks, { type: "audio/webm" });
+            setAttachments((prev) => [...prev, { name: `recording-${Date.now()}.webm`, blob, type: "audio" }]);
+            stream.getTracks().forEach((t) => t.stop());
+          };
+          mr.start();
+          recognitionRef.current = mr;
+        }
         setRecording(true);
         setRecordingTime(0);
         recordingTimerRef.current = window.setInterval(() => {
