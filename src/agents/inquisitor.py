@@ -42,6 +42,23 @@ class InquisitorAgent:
             max_tokens=1500,
         )
 
+    async def converse(self, current_idea: str, history: List[str] | None = None) -> dict:
+        """对话模式：针对当前想法提一个精准追问，引导用户逐步完善"""
+        ctx = ""
+        if history:
+            ctx = "对话历史:\n" + "\n".join(history[-6:])
+        messages = [
+            {"role": "system", "content": """你是技术导师。用户有模糊想法，通过追问帮ta细化。
+只提1个精准问题，引导思考：约束条件、技术选型、边界场景、性能、一致性。
+如果想法已足够具体(有具体技术栈/量化指标/明确场景)，completeness>0.8。
+输出 JSON: {"question":"...","context":"为什么问","completeness":0.0-1.0}"""},
+            {"role": "user", "content": f"当前想法: {current_idea}\n{ctx}\n请提一个追问。"},
+        ]
+        data = await self.agent.call_llm_json(messages)
+        if data.get("_parse_error"):
+            return {"question": "", "context": "", "completeness": 0.5}
+        return data
+
     async def interrogate(self, clusters: List[ConceptCluster],
                           nodes: List[IdeaNode],
                           north_star: str) -> dict:

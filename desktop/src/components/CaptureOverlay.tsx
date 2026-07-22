@@ -34,7 +34,11 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [recordingTime, setRecordingTime] = useState(0);
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [aiQuestion, setAiQuestion] = useState<{ question: string; context: string; completeness: number } | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<string[]>([]);
+  const [conversing, setConversing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const converseTimerRef = useRef<number | null>(null);
 
   const prompts = [
     "你的微服务最大的性能瓶颈在哪里？",
@@ -220,6 +224,15 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         }
       }
 
+      // 记录对话历史
+      if (aiQuestion?.question) {
+        setConversationHistory((prev) => [
+          ...prev,
+          `Q: ${aiQuestion.question}`,
+          `A: ${text}`,
+        ].slice(-12));
+        setAiQuestion(null);
+      }
       setContent("");
       setAttachments([]);
       setSuccess(true);
@@ -245,6 +258,26 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (val: string) => {
+    setContent(val);
+    // 输入停顿 1.5s 后自动触发 AI 追问
+    if (converseTimerRef.current) clearTimeout(converseTimerRef.current);
+    if (val.trim().length > 15) {
+      converseTimerRef.current = window.setTimeout(() => {
+        fetch("http://localhost:8765/api/v2/converse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idea: val, history: conversationHistory }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.question) setAiQuestion(d);
+          })
+          .catch(() => {});
+      }, 1500);
     }
   };
 
@@ -355,7 +388,7 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
           className="input-area"
           placeholder={prompts[placeholderIdx]}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           autoFocus
         />
@@ -374,6 +407,23 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
           </div>
         )}
       </div>
+
+      {/* AI 追问气泡 */}
+      {aiQuestion && aiQuestion.question && (
+        <div style={{
+          margin: "0 24px 4px", padding: "8px 14px", borderRadius: 12,
+          background: "#F0F9FF", border: "1px solid #BAE6FD",
+          fontSize: 12, color: "#0369A1", lineHeight: 1.5,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>💬 {aiQuestion.question}</div>
+          {aiQuestion.context && (
+            <div style={{ fontSize: 11, color: "#6E6E7C" }}>{aiQuestion.context}</div>
+          )}
+          {aiQuestion.completeness > 0.7 && (
+            <div style={{ fontSize: 11, color: "#10B981", marginTop: 4 }}>✓ 想法已足够具体，可以提交了</div>
+          )}
+        </div>
+      )}
 
       {/* Hint */}
       <p className="hint">
