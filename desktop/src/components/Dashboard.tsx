@@ -25,9 +25,12 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   const [backendError, setBackendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsConfig, setNeedsConfig] = useState(false);
-  const [tab, setTab] = useState<"ideas" | "graph" | "designs" | "v3">("ideas");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [tab, setTab] = useState<"ideas" | "graph" | "designs" | "v3" | "news">("ideas");
   const [ideaPage, setIdeaPage] = useState(1);
   const [designPage, setDesignPage] = useState(1);
+  const [dailyPrompt, setDailyPrompt] = useState<{ question: string; context: string } | null>(null);
+  const [newsItems, setNewsItems] = useState<any[]>([]);
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -68,6 +71,14 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
       const p = await api.listProposals();
       setProposals(p.proposals || []);
     } catch (e) { errs.push("V3 提案加载失败"); }
+    try {
+      const r = await fetch("http://localhost:8765/api/daily-prompt");
+      if (r.ok) setDailyPrompt(await r.json());
+    } catch {}
+    try {
+      const r = await fetch("http://localhost:8765/api/tech-news");
+      if (r.ok) { const d = await r.json(); setNewsItems(d.items || []); }
+    } catch {}
 
     if (errs.length) setBackendError(errs.join(" · "));
     setLoading(false);
@@ -177,6 +188,35 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           </div>
         )}
 
+        {/* 每日思考题 */}
+        {dailyPrompt && dailyPrompt.question && (
+          <div style={{
+            margin: "0 0 12px", padding: "12px 16px", borderRadius: 12,
+            background: "linear-gradient(135deg, #ECFEFF, #F0F9FF)",
+            border: "1px solid #CFFAFE", cursor: "pointer",
+          }} onClick={async () => {
+            try {
+              const s = await api.createSession(dailyPrompt.question.slice(0, 80));
+              await api.submitIdea(dailyPrompt.question, s.session_id);
+              setToastMsg("✓ 已作为想法捕捉");
+              setTimeout(() => setToastMsg(null), 2000);
+            } catch {}
+          }}>
+            <div style={{ fontSize: 11, color: "#0891B2", fontWeight: 600, marginBottom: 4 }}>
+              💡 每日思考
+            </div>
+            <div style={{ fontSize: 13, color: "#1A1A2E", fontWeight: 500, lineHeight: 1.5 }}>
+              {dailyPrompt.question}
+            </div>
+            {dailyPrompt.context && (
+              <div style={{ fontSize: 11, color: "#6E6E7C", marginTop: 4 }}>
+                {dailyPrompt.context}
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: "#A0A0AC", marginTop: 6 }}>点击捕捉为想法 →</div>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="stats-row">
           <div className="stat-card">
@@ -217,6 +257,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
             { key: "graph", label: "图谱" },
             { key: "designs", label: `设计 · ${designs.length}` },
             { key: "v3", label: `V3 · ${proposals.length}` },
+            { key: "news", label: `资讯 · ${newsItems.length}` },
           ].map((t) => (
             <button
               key={t.key}
@@ -313,7 +354,48 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
             )}
           </>
         )}
+
+        {/* Tab: 资讯 */}
+        {tab === "news" && (
+          <>
+            {newsItems.map((item: any, i: number) => (
+              <div key={i} className="card" onClick={async () => {
+                try {
+                  const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(item),
+                  });
+                  if (r.ok) {
+                    setToastMsg(`✓ 已捕捉: ${item.title?.slice(0, 30)}`);
+                    setTimeout(() => setToastMsg(null), 2000);
+                    loadAll();
+                  }
+                } catch {}
+              }}>
+                <div className="card-title">{item.title?.slice(0, 100)}</div>
+                <div className="card-subtitle">
+                  {item.source} · {item.description?.slice(0, 80)}
+                </div>
+              </div>
+            ))}
+            {newsItems.length === 0 && (
+              <div className="empty-state">正在抓取技术资讯...</div>
+            )}
+          </>
+        )}
         </div>
+
+        {/* Toast */}
+        {toastMsg && (
+          <div style={{
+            position: "absolute", bottom: 48, left: "50%", transform: "translateX(-50%)",
+            padding: "6px 16px", borderRadius: 999, background: "#1A1A2E", color: "#FFF",
+            fontSize: 12, zIndex: 10, whiteSpace: "nowrap",
+          }}>
+            {toastMsg}
+          </div>
+        )}
 
         {/* 快捷键提示 */}
         <div style={{ textAlign: "center", padding: "24px 0 8px", fontSize: 11, color: "#A0A0AC" }}>
