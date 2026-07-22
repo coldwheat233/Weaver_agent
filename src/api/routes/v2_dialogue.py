@@ -7,13 +7,13 @@ from src.storage.database import get_async_session
 from src.storage.session_repo import SessionRepo
 from src.storage.idea_repo import IdeaRepo
 from src.storage.cluster_repo import ClusterRepo
-from src.core.llm_service import LiteLLMService
 from src.agents.inquisitor import InquisitorAgent, DialogueManager
 from src.utils.logging_config import logger
 
 router = APIRouter(prefix="/api/v2", tags=["v2-dialogue"])
 
-llm = LiteLLMService()
+from src.core.deepseek_service import OpenAICompatibleService
+llm = OpenAICompatibleService()
 inquisitor = InquisitorAgent(llm)
 
 # 内存中的对话管理器（单用户桌面应用可以，多用户需改为 DB 存储）
