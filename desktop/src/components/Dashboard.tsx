@@ -360,30 +360,28 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           <>
             {newsItems.filter((item: any) => !item.title?.startsWith("抓取失败")).map((item: any, i: number) => (
               <div key={i} className="card" style={{ transition: "opacity 0.2s" }}
-                onClick={async (e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.opacity = "0.5";
-                  try {
-                    const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(item),
-                    });
-                    if (r.ok) {
-                      const d = await r.json();
-                      setToastMsg(`✓ 已捕捉: ${d.title?.slice(0, 30) || item.title?.slice(0, 30)}`);
-                      setTimeout(() => setToastMsg(null), 2000);
-                      loadAll();
-                    } else {
-                      setToastMsg("✗ 捕捉失败");
-                      setTimeout(() => setToastMsg(null), 2000);
-                    }
-                  } catch {
-                    setToastMsg("✗ 网络错误");
-                    setTimeout(() => setToastMsg(null), 2000);
-                  }
-                  el.style.opacity = "1";
-                }}>
-                <div className="card-title">{item.title?.slice(0, 100)}</div>
+                onClick={() => item.link && openUrl(item.link)}
+                style={{ cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div className="card-title" style={{ flex: 1 }}>{item.title?.slice(0, 100)}</div>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(item),
+                        });
+                        if (r.ok) { setToastMsg("✓ 已捕捉"); setTimeout(() => setToastMsg(null), 2000); loadAll(); }
+                      } catch { setToastMsg("✗ 失败"); setTimeout(() => setToastMsg(null), 2000); }
+                    }}
+                    style={{
+                      padding: "2px 10px", border: "1px solid #CFFAFE", borderRadius: 999,
+                      background: "#ECFEFF", color: "#0891B2", fontSize: 11, cursor: "pointer",
+                      fontFamily: "inherit", flexShrink: 0, marginLeft: 8,
+                    }}
+                  >捕捉</button>
+                </div>
                 <div className="card-subtitle">
                   {item.source} · {item.description?.slice(0, 80)}
                 </div>
