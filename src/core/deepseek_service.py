@@ -69,6 +69,7 @@ class OpenAICompatibleService(LLMService):
                 output_tokens=usage.get("completion_tokens", 0),
                 cost_usd=0.0,
                 latency_ms=elapsed,
+                finish_reason=choice.get("finish_reason", "stop"),
             )
         except Exception as e:
             logger.error(f"LLM API error ({self.base_url}): {e}")

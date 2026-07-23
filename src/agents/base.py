@@ -21,37 +21,68 @@ class BaseAgent:
         self.retry_count = retry_count
 
     async def call_llm(self, messages: List[Dict[str, str]],
-                       response_format: Optional[dict] = None):
-        """调用 LLM，带重试 + 追踪"""
+                       response_format: Optional[dict] = None,
+                       max_retries: int = 3):
+        """调用 LLM，带重试 + 追踪 + 截断自动压缩
+
+        当 finish_reason='length' 时自动压缩 prompt 重试（最多 2 次）
+        """
         from src.utils.tracing import get_trace_id
         import time
 
         last_error = None
         trace_id = get_trace_id()
-        for attempt in range(self.retry_count + 1):
+        msgs = list(messages)  # 避免修改调用方原始 messages
+
+        for attempt in range(max_retries):
             t0 = time.monotonic()
             try:
                 resp = await self.llm.complete(
-                    messages=messages,
+                    messages=msgs,
                     model=self.model,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                     response_format=response_format,
                 )
                 elapsed = (time.monotonic() - t0) * 1000
+
+                # 截断检测：LLM 输出被 max_tokens 截断 → 自动压缩 prompt 重试
+                if resp.finish_reason == "length" and attempt < max_retries - 1:
+                    logger.bind(component="base_agent", trace_id=trace_id).warning(
+                        f"LLM output truncated (finish_reason=length), compressing and retrying..."
+                    )
+                    msgs = self._compress_messages(msgs)
+                    continue
+
                 logger.bind(component="base_agent", trace_id=trace_id).debug(
                     f"LLM call OK: model={self.model} tokens_in={resp.input_tokens} "
                     f"tokens_out={resp.output_tokens} latency={elapsed:.0f}ms "
-                    f"cost=${resp.cost_usd:.4f}"
+                    f"cost=${resp.cost_usd:.4f} finish={resp.finish_reason}"
                 )
                 return resp
             except Exception as e:
                 last_error = e
-                logger.warning(f"LLM call attempt {attempt+1}/{self.retry_count+1} failed: {e}")
-                if attempt < self.retry_count:
+                logger.warning(f"LLM call attempt {attempt+1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
                     import asyncio
                     await asyncio.sleep(1 * (attempt + 1))
         raise last_error
+
+    @staticmethod
+    def _compress_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """压缩 prompt：截短每条消息到 50%，system message 优先保留"""
+        compressed = []
+        for msg in messages:
+            content = msg.get("content", "")
+            if len(content) > 500:
+                if msg["role"] == "system":
+                    # system message 保留 60%
+                    content = content[:int(len(content) * 0.6)]
+                else:
+                    # user/assistant 保留 40%
+                    content = content[:int(len(content) * 0.4)]
+            compressed.append({**msg, "content": content})
+        return compressed
 
     async def call_llm_json(self, messages: List[Dict[str, str]]) -> dict:
         """调用 LLM 并解析 JSON 响应，带降级"""

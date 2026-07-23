@@ -15,6 +15,7 @@ class LLMResponse(BaseModel):
     output_tokens: int = 0
     cost_usd: float = 0.0
     latency_ms: float = 0.0
+    finish_reason: str = "stop"  # "stop" | "length" (截断)
 
 
 class LLMService(ABC):
@@ -100,4 +101,4 @@ class FakeLLMService(LLMService):
         self.calls.append({"messages": messages, "model": model})
         resp = self.responses[self.call_count % len(self.responses)]
         self.call_count += 1
-        return LLMResponse(content=resp, model="fake", cost_usd=0.0, latency_ms=1.0)
+        return LLMResponse(content=resp, model="fake", cost_usd=0.0, latency_ms=1.0, finish_reason="stop")
