@@ -359,9 +359,9 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
         {tab === "news" && (
           <>
             {newsItems.filter((item: any) => !item.title?.startsWith("抓取失败")).map((item: any, i: number) => (
-              <div key={i} className="card" style={{ transition: "opacity 0.2s" }}
-                onClick={() => item.link && openUrl(item.link)}
-                style={{ cursor: "pointer" }}>
+              <div key={i} className="card"
+                style={{ transition: "opacity 0.2s", cursor: "pointer" }}
+                onClick={() => item.link && openUrl(item.link)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div className="card-title" style={{ flex: 1 }}>{item.title?.slice(0, 100)}</div>
                   <button
