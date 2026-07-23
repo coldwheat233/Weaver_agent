@@ -360,8 +360,9 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           <>
             {newsItems.filter((item: any) => !item.title?.startsWith("抓取失败")).map((item: any, i: number) => (
               <div key={i} className="card" style={{ transition: "opacity 0.2s" }}
-                onClick={async function(this: HTMLDivElement) {
-                  this.style.opacity = "0.5";
+                onClick={async (e) => {
+                  const el = e.currentTarget as HTMLDivElement;
+                  el.style.opacity = "0.5";
                   try {
                     const r = await fetch("http://localhost:8765/api/tech-news/ingest", {
                       method: "POST", headers: { "Content-Type": "application/json" },
@@ -380,7 +381,7 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
                     setToastMsg("✗ 网络错误");
                     setTimeout(() => setToastMsg(null), 2000);
                   }
-                  this.style.opacity = "1";
+                  el.style.opacity = "1";
                 }}>
                 <div className="card-title">{item.title?.slice(0, 100)}</div>
                 <div className="card-subtitle">
