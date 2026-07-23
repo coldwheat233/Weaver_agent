@@ -214,8 +214,51 @@ export default function Settings({ onBack, onClose }: Props) {
           配置保存在 ~/.weaver/config.json，保存后立即生效，无需重启。
           API Key 仅存储在本地，不会上传到任何第三方。
         </p>
+
+        {/* Agent 质量评估 */}
+        <HealthScore />
       </div>
     </>
+  );
+}
+
+function HealthScore() {
+  const [health, setHealth] = useState<any>(null);
+  useEffect(() => {
+    fetch("http://localhost:8765/api/system-health")
+      .then((r) => r.json())
+      .then(setHealth)
+      .catch(() => {});
+  }, []);
+
+  if (!health) return null;
+  const score = health.overall_score;
+  const statusColor = score === 1 ? "#10B981" : score >= 0.8 ? "#F59E0B" : "#EF4444";
+  const statusText = health.overall_status === "healthy" ? "✓ 健康" : health.overall_status === "degraded" ? "⚠ 降级" : "✗ 注意";
+
+  return (
+    <div style={{
+      marginTop: 20, padding: "12px 16px", borderRadius: 12,
+      background: "#FAFAFA", border: "1px solid #E5E5E8",
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#6E6E7C", marginBottom: 8 }}>
+        Agent 质量评估
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: statusColor, marginBottom: 4 }}>
+        {statusText}  {(score * 100).toFixed(0)}%
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {Object.entries(health).filter(([k]) => k !== "overall_score" && k !== "overall_status").map(([k, v]: any) => (
+          <span key={k} style={{
+            fontSize: 10, padding: "2px 8px", borderRadius: 999,
+            background: v.status === "pass" ? "#ECFDF5" : "#FEF2F2",
+            color: v.status === "pass" ? "#059669" : "#EF4444",
+          }}>
+            {v.status === "pass" ? "✓" : "✗"} {k}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
