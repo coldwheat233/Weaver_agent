@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { api, InquisitorQuestion } from "../lib/api";
 
 const API = "http://localhost:8765";
 
@@ -15,8 +16,6 @@ async function startDrag() {
     await getCurrentWindow().startDragging();
   } catch {}
 }
-
-import { api, InquisitorQuestion } from "../lib/api";
 
 export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboard, onClose }: Props) {
   const [content, setContent] = useState("");
