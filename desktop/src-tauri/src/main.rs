@@ -97,26 +97,47 @@ fn main() {
             let handle = app.handle().clone();
 
             // ── Global Shortcuts ──
-            let h_input = handle.clone();
+            // Ctrl+Alt+[ : 切换输入窗口 (显示↔隐藏), 显示时定位到鼠标位置
             let _ = app.global_shortcut().on_shortcut(
                 Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketLeft),
-                move |_app, _sc, _event| {
-                    if let Some(w) = h_input.get_webview_window("input") {
-                        let _ = w.unminimize();
-                        let _ = w.show();
-                        let _ = w.set_focus();
+                move |app, _sc, _event| {
+                    if let Some(w) = app.get_webview_window("input") {
+                        match w.is_visible() {
+                            Ok(true) => {
+                                // 已可见 → 隐藏，让 dashboard 回到前台
+                                let _ = w.hide();
+                            }
+                            Ok(false) => {
+                                // 隐藏 → 显示在鼠标位置 (左上角偏移 280,20 使窗口居中于光标)
+                                if let Ok(pos) = app.cursor_position() {
+                                    let _ = w.set_position(tauri::Position::Physical(
+                                        tauri::PhysicalPosition::new(pos.x as i32 - 280, pos.y as i32 - 20),
+                                    ));
+                                }
+                                let _ = w.unminimize();
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                            _ => {}
+                        }
                     }
                 },
             );
 
-                let h_dash = handle.clone();
-                let _ = app.global_shortcut().on_shortcut(
-                    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketRight),
-                    move |_app, _sc, _event| {
-                        if let Some(w) = h_dash.get_webview_window("dashboard") {
-                            let _ = w.unminimize();
-                            let _ = w.show();
-                            let _ = w.set_focus();
+            // Ctrl+Alt+] : 切换用户后台 (显示↔隐藏)
+            let _ = app.global_shortcut().on_shortcut(
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketRight),
+                move |app, _sc, _event| {
+                    if let Some(w) = app.get_webview_window("dashboard") {
+                        match w.is_visible() {
+                            Ok(true) => { let _ = w.hide(); }
+                            Ok(false) => {
+                                let _ = w.unminimize();
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                            _ => {}
+                        }
                     }
                 },
             );

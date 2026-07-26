@@ -212,8 +212,18 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           }}>
             <div style={{ fontSize: 11, color: "#0891B2", fontWeight: 600, marginBottom: 4 }}>
               💡 每日思考
-            <button onClick={async (e: any) => { e.stopPropagation(); await fetch("http://localhost:8765/api/daily-prompt/refresh"); loadAll(); }}
-              style={{ float:"right", border:"none", background:"transparent", fontSize:14, cursor:"pointer", color:"#A0A0AC" }}>🔄</button>
+            <button
+              onClick={async (e: React.MouseEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
+                try {
+                  await fetch("http://localhost:8765/api/daily-prompt/refresh", { method: "POST" });
+                } catch {}
+                loadAll();
+              }}
+              className="refresh-btn"
+              title="刷新思考题"
+            >↻</button>
             </div>
             <div style={{ fontSize: 13, color: "#1A1A2E", fontWeight: 500, lineHeight: 1.5 }}>
               {dailyPrompt.question}
