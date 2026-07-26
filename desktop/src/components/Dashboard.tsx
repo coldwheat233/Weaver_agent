@@ -87,19 +87,25 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
   };
 
   const triggerWeave = async () => {
+    if (ideas.length === 0) { setBackendError("还没有想法，无法编织"); return; }
     setWeaving(true);
     setBackendError(null);
     try {
-      let sid = sessionId;
-      if (!sid) {
-        const s = await api.createSession("编织所有想法");
-        sid = s.session_id;
-        setSessionId(sid);
+      // 创建新 session 并关联所有想法
+      const s = await api.createSession("编织所有想法");
+      const sid = s.session_id;
+      setSessionId(sid);
+      // 把已有想法逐个提交到新 session
+      for (const idea of ideas) {
+        await api.submitIdea(idea.raw_content || idea.standardized_content || "", sid);
       }
       await api.triggerWeave(sid);
-      setTimeout(async () => {
+      // 轮询直到完成
+      let attempts = 0;
+      const poll = setInterval(async () => {
         try { setDesigns(await api.listDesigns()); } catch {}
-        setWeaving(false);
+        attempts++;
+        if (attempts > 20) { clearInterval(poll); setWeaving(false); }
       }, 3000);
     } catch (e) {
       setBackendError(`编织失败: ${e}`);
