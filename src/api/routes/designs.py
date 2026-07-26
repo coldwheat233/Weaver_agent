@@ -73,10 +73,16 @@ async def get_design_html(design_id: str):
     # 后端渲染 Markdown → HTML (零 CDN 依赖)
     import re as _re
     md = doc.content_markdown
-    # Mermaid 块 → <div class="mermaid">
+    # Mermaid 块 → 清洗语法 → <div class="mermaid">
     mermaid_blocks = []
     def _save_mermaid(m):
-        mermaid_blocks.append(m.group(1))
+        code = m.group(1)
+        # 修复 LLM 常见 Mermaid 语法错误
+        code = code.replace('“', '"').replace('”', '"')  # 中文引号
+        code = code.replace('"', '"').replace('"', '"')            # 其他变体
+        # subgraph 标签过复杂 → 简化
+        code = _re.sub(r'subgraph\s+".+?"', 'subgraph cluster', code)
+        mermaid_blocks.append(code)
         return '<div class="mermaid"></div>'
     md = _re.sub(r'```mermaid\n(.*?)```', _save_mermaid, md, flags=_re.DOTALL)
     # 基本 Markdown → HTML
