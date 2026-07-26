@@ -276,9 +276,10 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         })
           .then((r) => r.json())
           .then((d) => {
+            console.log("converse response:", d);
             if (d.question) setAiQuestion(d);
           })
-          .catch(() => {});
+          .catch((e) => { console.error("converse fetch failed:", e); });
       }, 1500);
     }
   };
