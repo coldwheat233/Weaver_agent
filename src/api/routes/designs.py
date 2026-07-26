@@ -70,14 +70,24 @@ async def get_design_html(design_id: str):
     if not doc:
         return HTMLResponse("<h1>Not Found</h1>", status_code=404)
 
-    # 构建自包含 HTML — marked.js 解析 Markdown, mermaid 渲染图表
+    # 后端渲染 Markdown → HTML (零 CDN 依赖)
+    import re as _re
+    md = doc.content_markdown
+    # Mermaid 块 → <div class="mermaid">
+    mermaid_blocks = []
+    def _save_mermaid(m):
+        mermaid_blocks.append(m.group(1))
+        return '<div class="mermaid"></div>'
+    md = _re.sub(r'```mermaid\n(.*?)```', _save_mermaid, md, flags=_re.DOTALL)
+    # 基本 Markdown → HTML
+    html_body = _simple_md_to_html(md)
+
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{doc.title} — Idea Weaver</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <style>
   :root {{
@@ -143,38 +153,18 @@ async def get_design_html(design_id: str):
   <div class="score-card"><span class="score-value">{doc.feasibility_score:.2f}</span><span class="score-label">可行性</span></div>
 </div>
 
-<div class="content" id="markdown-content"></div>
-
-<div id="raw-markdown" style="display:none">{__import__('html').escape(doc.content_markdown)}</div>
+<div class="content" id="markdown-content">{html_body}</div>
 
 <script>
-// 1. 从隐藏 div 读取原始 Markdown
-const raw = document.getElementById('raw-markdown').textContent;
-const mermaidBlocks = [];
-let processed = raw.replace(/```mermaid\n([\\s\\S]*?)```/g, (_, code) => {{
-  mermaidBlocks.push(code);
-  return '<div class="mermaid"></div>';
-}});
-
-// 2. Markdown → HTML
-marked.setOptions({{ breaks: true, gfm: true }});
-document.getElementById('markdown-content').innerHTML = marked.parse(processed);
-
-// 3. 渲染 Mermaid
+// Mermaid 渲染
 mermaid.initialize({{
   startOnLoad: false,
   theme: 'base',
   themeVariables: {{
-    primaryColor: '#ECFEFF',
-    primaryBorderColor: '#0891B2',
-    primaryTextColor: '#1A1A2E',
-    lineColor: '#A0A0AC',
+    primaryColor: '#ECFEFF', primaryBorderColor: '#0891B2',
+    primaryTextColor: '#1A1A2E', lineColor: '#A0A0AC',
     fontFamily: '"PingFang SC","Microsoft YaHei",sans-serif'
   }}
-}});
-mermaidBlocks.forEach((code, i) => {{
-  const el = document.querySelectorAll('.mermaid')[i];
-  if (el) el.textContent = code;
 }});
 mermaid.run({{ querySelector: '.mermaid' }});
 </script>
@@ -182,3 +172,41 @@ mermaid.run({{ querySelector: '.mermaid' }});
 </html>"""
 
     return HTMLResponse(html)
+
+
+def _simple_md_to_html(md: str) -> str:
+    """简易 Markdown → HTML（无需 CDN）"""
+    import re
+    # 代码块 (非 mermaid)
+    md = re.sub(r'```(\w*)\n(.*?)```', r'<pre><code>\2</code></pre>', md, flags=re.DOTALL)
+    # 行内代码
+    md = re.sub(r'`([^`]+)`', r'<code>\1</code>', md)
+    # 标题
+    md = re.sub(r'^#### (.+)$', r'<h4>\1</h4>', md, flags=re.MULTILINE)
+    md = re.sub(r'^### (.+)$', r'<h3>\1</h3>', md, flags=re.MULTILINE)
+    md = re.sub(r'^## (.+)$', r'<h2>\1</h2>', md, flags=re.MULTILINE)
+    md = re.sub(r'^# (.+)$', r'<h1>\1</h1>', md, flags=re.MULTILINE)
+    # 粗体/斜体
+    md = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', md)
+    md = re.sub(r'\*(.+?)\*', r'<em>\1</em>', md)
+    # 引用
+    md = re.sub(r'^> (.+)$', r'<blockquote>\1</blockquote>', md, flags=re.MULTILINE)
+    # 分隔线
+    md = re.sub(r'^---$', '<hr>', md, flags=re.MULTILINE)
+    # 无序列表
+    md = re.sub(r'^- (.+)$', r'<li>\1</li>', md, flags=re.MULTILINE)
+    md = re.sub(r'(<li>.*</li>)', r'<ul>\1</ul>', md, flags=re.DOTALL)
+    # 表格
+    md = re.sub(r'^\|(.+)\|$', lambda m: '<tr>' + ''.join(f'<td>{c.strip()}</td>' for c in m.group(1).split('|') if c.strip()) + '</tr>', md, flags=re.MULTILINE)
+    md = re.sub(r'<tr>(<td>-+</td>)+</tr>', '', md)
+    md = re.sub(r'(<tr>.*</tr>)', r'<table>\1</table>', md, flags=re.DOTALL)
+    # 段落
+    paragraphs = md.split('\n\n')
+    result = []
+    for p in paragraphs:
+        p = p.strip()
+        if not p or p.startswith('<h') or p.startswith('<pre') or p.startswith('<table') or p.startswith('<ul') or p.startswith('<blockquote') or p.startswith('<hr') or p.startswith('<div'):
+            result.append(p)
+        else:
+            result.append(f'<p>{p}</p>')
+    return '\n'.join(result)
