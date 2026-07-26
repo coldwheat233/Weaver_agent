@@ -40,7 +40,9 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
     import("@tauri-apps/api/event").then(({ listen }) => {
       listen("idea-submitted", () => loadAll()).then((fn) => { unlisten = fn; });
     }).catch(() => {});
-    return () => { unlisten?.(); };
+    // 每 30 分钟自动刷新
+    const timer = setInterval(loadAll, 30 * 60 * 1000);
+    return () => { unlisten?.(); clearInterval(timer); };
   }, []);
 
   const loadAll = async () => {
@@ -204,6 +206,8 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
           }}>
             <div style={{ fontSize: 11, color: "#0891B2", fontWeight: 600, marginBottom: 4 }}>
               💡 每日思考
+            <button onClick={async (e: any) => { e.stopPropagation(); await fetch("http://localhost:8765/api/daily-prompt/refresh"); loadAll(); }}
+              style={{ float:"right", border:"none", background:"transparent", fontSize:14, cursor:"pointer", color:"#A0A0AC" }}>🔄</button>
             </div>
             <div style={{ fontSize: 13, color: "#1A1A2E", fontWeight: 500, lineHeight: 1.5 }}>
               {dailyPrompt.question}
