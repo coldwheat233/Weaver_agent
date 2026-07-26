@@ -145,10 +145,10 @@ async def get_design_html(design_id: str):
 
 <div class="content" id="markdown-content"></div>
 
-<script type="text/plain" id="raw-markdown">{doc.content_markdown}</script>
+<div id="raw-markdown" style="display:none">{__import__('html').escape(doc.content_markdown)}</div>
 
 <script>
-// 1. 从 DOM 读取原始 Markdown（避免 JS 模板字面量转义问题）
+// 1. 从隐藏 div 读取原始 Markdown
 const raw = document.getElementById('raw-markdown').textContent;
 const mermaidBlocks = [];
 let processed = raw.replace(/```mermaid\n([\\s\\S]*?)```/g, (_, code) => {{
