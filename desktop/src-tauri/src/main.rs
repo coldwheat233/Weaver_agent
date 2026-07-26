@@ -96,19 +96,18 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // ── Global Shortcuts (已有实例时跳过, 避免 panic) ──
-            if !port_in_use(8765) {
-                let h_input = handle.clone();
-                let _ = app.global_shortcut().on_shortcut(
-                    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketLeft),
-                    move |_app, _sc, _event| {
-                        if let Some(w) = h_input.get_webview_window("input") {
-                            let _ = w.unminimize();
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
-                    },
-                );
+            // ── Global Shortcuts ──
+            let h_input = handle.clone();
+            let _ = app.global_shortcut().on_shortcut(
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketLeft),
+                move |_app, _sc, _event| {
+                    if let Some(w) = h_input.get_webview_window("input") {
+                        let _ = w.unminimize();
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                },
+            );
 
                 let h_dash = handle.clone();
                 let _ = app.global_shortcut().on_shortcut(
@@ -121,7 +120,6 @@ fn main() {
                     }
                 },
             );
-            } // if !port_in_use
 
             // ── System Tray ──
             let show_input = MenuItemBuilder::with_id("show_input", "✏️ 输入想法 (Ctrl+Alt+[)").build(app)?;
