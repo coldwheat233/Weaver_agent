@@ -145,11 +145,13 @@ async def get_design_html(design_id: str):
 
 <div class="content" id="markdown-content"></div>
 
+<script type="text/plain" id="raw-markdown">{doc.content_markdown}</script>
+
 <script>
-// 1. 提取 Mermaid 块并替换为占位符
-const raw = `{doc.content_markdown.replace('`', '\\`').replace('$', '\\$')}`;
+// 1. 从 DOM 读取原始 Markdown（避免 JS 模板字面量转义问题）
+const raw = document.getElementById('raw-markdown').textContent;
 const mermaidBlocks = [];
-let processed = raw.replace(/```mermaid\\n([\\s\\S]*?)```/g, (_, code) => {{
+let processed = raw.replace(/```mermaid\n([\\s\\S]*?)```/g, (_, code) => {{
   mermaidBlocks.push(code);
   return '<div class="mermaid"></div>';
 }});
