@@ -15,6 +15,9 @@ class ConfigUpdate(BaseModel):
     model: Optional[str] = None
     light_model: Optional[str] = None
     temperature: Optional[float] = None
+    embedding_api_key: Optional[str] = None
+    embedding_base_url: Optional[str] = None
+    embedding_model: Optional[str] = None
 
 
 @router.get("")

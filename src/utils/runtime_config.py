@@ -45,6 +45,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "model": "deepseek-chat",
     "light_model": "deepseek-chat",
     "temperature": 0.7,
+    "embedding_api_key": "",
+    "embedding_base_url": "https://dashscope.aliyuncs.com/compatible-mode",
+    "embedding_model": "qwen3.7-text-embedding",
 }
 
 
@@ -117,7 +120,10 @@ class RuntimeConfig:
         else:
             cfg["api_key_masked"] = ""
         cfg["has_api_key"] = bool(key)
+        emb_key = cfg.get("embedding_api_key", "")
+        cfg["has_emb_key"] = bool(emb_key)
         cfg.pop("api_key", None)
+        cfg.pop("embedding_api_key", None)
         return cfg
 
     @classmethod

@@ -16,6 +16,9 @@ interface Config {
   temperature: number;
   api_key_masked: string;
   has_api_key: boolean;
+  has_emb_key: boolean;
+  embedding_base_url: string;
+  embedding_model: string;
   providers: ProviderInfo[];
 }
 
@@ -32,6 +35,9 @@ export default function Settings({ onBack, onClose }: Props) {
   const [model, setModel] = useState("");
   const [lightModel, setLightModel] = useState("");
   const [temperature, setTemperature] = useState(0.7);
+  const [embApiKey, setEmbApiKey] = useState("");
+  const [embBaseUrl, setEmbBaseUrl] = useState("");
+  const [embModel, setEmbModel] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saved, setSaved] = useState(false);
@@ -48,6 +54,8 @@ export default function Settings({ onBack, onClose }: Props) {
       setModel(d.model);
       setLightModel(d.light_model);
       setTemperature(d.temperature);
+      setEmbBaseUrl(d.embedding_base_url || "https://dashscope.aliyuncs.com/compatible-mode");
+      setEmbModel(d.embedding_model || "qwen3.7-text-embedding");
     } catch (e) {
       setTestResult({ ok: false, msg: "无法连接后端" });
     }
@@ -92,8 +100,11 @@ export default function Settings({ onBack, onClose }: Props) {
       model,
       light_model: lightModel,
       temperature,
+      embedding_model: embModel,
+      embedding_base_url: embBaseUrl,
     };
     if (apiKey) body.api_key = apiKey;
+    if (embApiKey) body.embedding_api_key = embApiKey;
     try {
       const r = await fetch(`${API}/api/config`, {
         method: "PUT",
@@ -187,6 +198,36 @@ export default function Settings({ onBack, onClose }: Props) {
           onChange={(e) => setTemperature(parseFloat(e.target.value))}
           style={{ width: "100%", accentColor: "#0891B2" }}
         />
+
+        {/* ── Embedding 配置 ── */}
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #E5E5E8" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#6E6E7C", marginBottom: 8 }}>📐 向量模型 (Embedding)</div>
+
+          <label style={labelStyle}>向量 API Key</label>
+          <input
+            type="password"
+            value={embApiKey}
+            onChange={(e) => setEmbApiKey(e.target.value)}
+            placeholder={cfg?.has_emb_key ? "留空则保持不变" : "sk-..."}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle}>向量 Base URL</label>
+          <input
+            value={embBaseUrl}
+            onChange={(e) => setEmbBaseUrl(e.target.value)}
+            placeholder="https://dashscope.aliyuncs.com/compatible-mode"
+            style={inputStyle}
+          />
+
+          <label style={labelStyle}>向量模型</label>
+          <input
+            value={embModel}
+            onChange={(e) => setEmbModel(e.target.value)}
+            placeholder="qwen3.7-text-embedding"
+            style={inputStyle}
+          />
+        </div>
 
         {/* Test result */}
         {testResult && (
