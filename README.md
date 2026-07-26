@@ -5,7 +5,7 @@
 
 ## 用户使用（推荐）
 
-从 [Releases](../../releases) 下载 `IdeaWeaver-Setup.msi`，安装即用：
+从 [Releases](../../releases) 下载 `IdeaWeaver-Setup.exe`，安装即用：
 
 1. 首次打开 → 点 ⚙ 配置模型 API Key（支持 DeepSeek / OpenAI / Ollama 本地 / 自定义 OpenAI 兼容）
 2. 系统托盘常驻，左键切换后台
