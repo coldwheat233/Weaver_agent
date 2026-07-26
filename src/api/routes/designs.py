@@ -73,18 +73,75 @@ async def get_design_html(design_id: str):
     # 后端渲染 Markdown → HTML (零 CDN 依赖)
     import re as _re
     md = doc.content_markdown
-    # Mermaid 块 → 清洗语法 → <div class="mermaid">
-    mermaid_blocks = []
+    # Mermaid 块 → 清洗语法 → <div class="mermaid">code</div>
     def _save_mermaid(m):
         code = m.group(1)
-        # 移除 subgraph 中文标签（Mermaid 10 不支持复杂标签）
-        code = _re.sub(r'subgraph\s+[^\n]+', 'subgraph ', code)
-        # 移除行内 \\n 转义（LLM 在 subgraph 标签里嵌入的）
+        # 1. 字面量 \n → 真换行
         code = code.replace('\\n', '\n')
-        # 中文引号 → 英文
+        # 2. 中文引号 → 英文
         code = code.replace('“', '"').replace('”', '"')
-        mermaid_blocks.append(code)
-        return '<div class="mermaid"></div>'
+        # 3. graph → flowchart（向下兼容，支持 & 多节点语法）
+        code = _re.sub(r'\bgraph\s+(TD|LR|BT|RL)\b', r'flowchart \1', code)
+        # 5. subgraph 行清洗：去掉中文，保留 ASCII 标签；纯中文用唯一 ID
+        _sg_counter = [0]
+        def _clean_subgraph(sm):
+            label = sm.group(1).strip()
+            ascii_part = _re.sub(r'[^\x00-\x7F]+', '', label).strip()
+            ascii_part = ascii_part.strip('"\'').strip()
+            if not ascii_part:
+                _sg_counter[0] += 1
+                ascii_part = f'SG{_sg_counter[0]}'
+            return f'subgraph "{ascii_part}"'
+        code = _re.sub(r'subgraph\s+(.+)', _clean_subgraph, code)
+        # 6. 含中文/特殊字符的节点标签加双引号（覆盖全部 4 种 Mermaid 节点形状）
+        def _quote_node(nm):
+            nid = nm.group(1)
+            br = nm.group(2)   # [ { ( >
+            label = nm.group(3)
+            cl = nm.group(4)   # ] } ) ]
+            # 已是 "..." 包裹则跳过
+            if label.startswith('"') and label.endswith('"'):
+                return nm.group(0)
+            if _re.search(r'[一-鿿＀-￯/:()（）]', label):
+                clean = label.replace('"', "'")
+                return f'{nid}{br}"{clean}"{cl}'
+            return nm.group(0)
+        code = _re.sub(r'(\w+)(\[)([^\]]+)(\])', _quote_node, code)   # 方括号
+        code = _re.sub(r'(\w+)(\{)([^}]+)(\})', _quote_node, code)    # 花括号
+        code = _re.sub(r'(\w+)(\()([^)]+)(\))', _quote_node, code)    # 圆括号
+        code = _re.sub(r'(\w+)(>)([^\]]+)(\])', _quote_node, code)    # 不对称（稀有，但保留）
+        # 7. 边标签：含中文的 -->|标签| → 加引号保护
+        def _quote_edge(em):
+            lbl = em.group(2)
+            if lbl.startswith('"') and lbl.endswith('"'):
+                return em.group(0)
+            if _re.search(r'[一-鿿]', lbl):
+                return f'{em.group(1)}"{lbl}"{em.group(3)}'
+            return em.group(0)
+        code = _re.sub(r'(-[.\-]?>?\s*\|)([^|]+)(\|)', _quote_edge, code)
+        # 8. 展开 & 多节点语法 → 独立边（消除版本兼容风险）
+        def _expand_ampersand(line):
+            if '&' not in line:
+                return line
+            # 匹配: NODES & NODES  ARROW  NODES & NODES（edge label 版 & 无 label 版）
+            m = _re.match(r'^(\s*)([\w\s&]+?)(\s*(?:-[.\-]?>|==>)\s*\|[^|]+\|)(\s*)([\w\s&]+)(.*)', line)
+            if not m:
+                m = _re.match(r'^(\s*)([\w\s&]+?)(\s*(?:-[.\-]?>|==>))(\s*)([\w\s&]+)(.*)', line)
+            if m:
+                indent = m.group(1)
+                left_nodes  = [n.strip() for n in m.group(2).split('&')]
+                arrow = m.group(3).strip()
+                # m.group(4) is whitespace between arrow and right side — discard, use single space
+                right_nodes = [n.strip() for n in m.group(5).split('&')]
+                rest = m.group(6)
+                if len(left_nodes) > 1:
+                    return '\n'.join(f'{indent}{n} {arrow} {right_nodes[0]}{rest}' for n in left_nodes)
+                elif len(right_nodes) > 1:
+                    return '\n'.join(f'{indent}{left_nodes[0]} {arrow} {n}{rest}' for n in right_nodes)
+            return line
+        code = '\n'.join(_expand_ampersand(l) for l in code.split('\n'))
+        # 9. 插入 div（Mermaid 代码作为 textContent）
+        return f'<div class="mermaid">{code}</div>'
     md = _re.sub(r'```mermaid\n(.*?)```', _save_mermaid, md, flags=_re.DOTALL)
     # 基本 Markdown → HTML
     html_body = _simple_md_to_html(md)
@@ -166,6 +223,7 @@ async def get_design_html(design_id: str):
 // Mermaid 渲染
 mermaid.initialize({{
   startOnLoad: false,
+  securityLevel: 'loose',
   theme: 'base',
   themeVariables: {{
     primaryColor: '#ECFEFF', primaryBorderColor: '#0891B2',

@@ -27,6 +27,57 @@ async function load() {
   }
 }
 
+/**
+ * Sanitize LLM-generated Mermaid code for Mermaid 10.9.0 compatibility.
+ */
+function sanitizeMermaid(code) {
+  // 1. literal \n → real newlines
+  code = code.replace(/\\n/g, '\n');
+  // 2. Chinese quotes → ASCII
+  code = code.replace(/“/g, '"').replace(/”/g, '"');
+  // 3. graph → flowchart (supports & multi-node syntax)
+  code = code.replace(/\bgraph\s+(TD|LR|BT|RL)\b/g, 'flowchart $1');
+  // 4. subgraph: strip Chinese, keep ASCII label; unique IDs for pure-CN
+  let sgCounter = 0;
+  code = code.replace(/subgraph\s+(.+)/g, (_, label) => {
+    label = label.trim();
+    let ascii = label.replace(/[^\x00-\x7F]+/g, '').trim();
+    ascii = ascii.replace(/^["']|["']$/g, '').trim();
+    if (!ascii) { sgCounter++; ascii = 'SG' + sgCounter; }
+    return 'subgraph "' + ascii + '"';
+  });
+  // 5. Quote node labels with Chinese/special chars (all 4 shapes)
+  function quote(label) {
+    if (/^".*"$/.test(label)) return label;               // already quoted
+    if (/[一-鿿＀-￯/:()（）]/.test(label)) {
+      return '"' + label.replace(/"/g, "'") + '"';
+    }
+    return label;
+  }
+  code = code.replace(/(\w+)(\[)([^\]]+)(\])/g, (_, n, b, l, c) => n + b + quote(l) + c);
+  code = code.replace(/(\w+)(\{)([^}]+)(\})/g, (_, n, b, l, c) => n + b + quote(l) + c);
+  code = code.replace(/(\w+)(\()([^)]+)(\))/g, (_, n, b, l, c) => n + b + quote(l) + c);
+  code = code.replace(/(\w+)(>)([^\]]+)(\])/g, (_, n, b, l, c) => n + b + quote(l) + c);
+  // 6. Edge labels with Chinese
+  code = code.replace(/(-[.\-]?>?\s*\|)([^|]+)(\|)/g, (_, pre, lbl, suf) => {
+    if (/^".*"$/.test(lbl)) return _;
+    if (/[一-鿿]/.test(lbl)) return pre + '"' + lbl + '"' + suf;
+    return _;
+  });
+  return code;
+}
+
+mermaid.initialize({
+  startOnLoad: false,
+  securityLevel: 'loose',
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#ECFEFF', primaryBorderColor: '#0891B2',
+    primaryTextColor: '#1A1A2E', lineColor: '#A0A0AC',
+    fontFamily: '"PingFang SC","Microsoft YaHei",sans-serif'
+  }
+});
+
 function render(data) {
   // Title
   document.getElementById('design-title').textContent = data.title;
@@ -45,12 +96,13 @@ function render(data) {
   const markdownHtml = simpleMarkdownToHtml(data.content_markdown);
   document.getElementById('markdown-content').innerHTML = markdownHtml;
 
-  // Extract Mermaid diagrams
+  // Extract Mermaid diagrams + sanitize for Mermaid 10.9.0
   const mermaidMatches = data.content_markdown.match(/```mermaid\n([\s\S]*?)```/g);
   if (mermaidMatches) {
     const mermaidCode = mermaidMatches.map(m => m.replace(/```mermaid\n/, '').replace(/```$/, '')).join('\n');
-    document.getElementById('mermaid-render').innerHTML = `<div class="mermaid">${mermaidCode}</div>`;
-    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+    const sanitized = sanitizeMermaid(mermaidCode);
+    document.getElementById('mermaid-render').innerHTML = `<div class="mermaid">${sanitized}</div>`;
+    mermaid.run({ querySelector: '.mermaid' });
   } else {
     document.getElementById('mermaid-section').style.display = 'none';
   }
