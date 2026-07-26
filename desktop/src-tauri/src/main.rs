@@ -6,7 +6,7 @@ use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::image::Image;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 struct PythonBackend(Mutex<Option<Child>>);
 
@@ -100,7 +100,8 @@ fn main() {
             // Ctrl+Alt+[ : 切换输入窗口 (显示↔隐藏), 显示时定位到鼠标位置
             let _ = app.global_shortcut().on_shortcut(
                 Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketLeft),
-                move |app, _sc, _event| {
+                move |app, _sc, event| {
+                    if event.state != ShortcutState::Pressed { return; }
                     if let Some(w) = app.get_webview_window("input") {
                         match w.is_visible() {
                             Ok(true) => {
@@ -127,7 +128,8 @@ fn main() {
             // Ctrl+Alt+] : 切换用户后台 (显示↔隐藏)
             let _ = app.global_shortcut().on_shortcut(
                 Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::BracketRight),
-                move |app, _sc, _event| {
+                move |app, _sc, event| {
+                    if event.state != ShortcutState::Pressed { return; }
                     if let Some(w) = app.get_webview_window("dashboard") {
                         match w.is_visible() {
                             Ok(true) => { let _ = w.hide(); }
