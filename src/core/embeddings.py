@@ -1,41 +1,35 @@
-"""Embedding 生成服务 —— 通过 LiteLLM 调用"""
+"""Embedding 生成服务 —— 通过 OpenAICompatibleService"""
 
 from typing import List
-from src.utils.config import get_settings
-
-settings = get_settings()
 
 
 class EmbeddingService:
-    """生成文本 embedding 向量"""
+    def __init__(self, model: str = "text-embedding-3-small"):
+        self.model = model
+        self._service = None
 
-    def __init__(self, model: str | None = None):
-        self.model = model or settings.EMBEDDING_MODEL
+    @property
+    def service(self):
+        if self._service is None:
+            from src.core.deepseek_service import OpenAICompatibleService
+            self._service = OpenAICompatibleService()
+        return self._service
 
     async def generate(self, text: str) -> List[float]:
-        """为单条文本生成 embedding"""
         embeddings = await self.batch_generate([text])
         return embeddings[0]
 
     async def batch_generate(self, texts: List[str]) -> List[List[float]]:
-        """批量生成 embedding"""
-        import litellm
-
-        # 过滤空文本
         non_empty = [(i, t) for i, t in enumerate(texts) if t and t.strip()]
         if not non_empty:
             return [[0.0] for _ in texts]
 
-        try:
-            resp = await litellm.aembedding(
-                model=self.model,
-                input=[t for _, t in non_empty],
-            )
-            # 重建结果数组（保持与输入索引一致）
-            result = [[0.0] for _ in texts]
-            for idx, (orig_idx, _) in enumerate(non_empty):
-                result[orig_idx] = resp.data[idx]["embedding"]
-            return result
-        except Exception as e:
-            # 降级：返回零向量
-            return [[0.0] for _ in texts]
+        result = await self.service.embed(
+            texts=[t for _, t in non_empty],
+            model=self.model,
+        )
+        # 重建结果数组，保持与输入索引一致
+        output = [[0.0] for _ in texts]
+        for idx, (orig_idx, _) in enumerate(non_empty):
+            output[orig_idx] = result[idx] if idx < len(result) else [0.0]
+        return output

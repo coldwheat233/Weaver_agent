@@ -36,7 +36,8 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [aiQuestion, setAiQuestion] = useState<{ question: string; context: string; completeness: number } | null>(null);
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
-  const [conversing, setConversing] = useState(false);
+  const [converseRound, setConverseRound] = useState(1);
+  const MAX_ROUNDS = 3;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const converseTimerRef = useRef<number | null>(null);
 
@@ -224,13 +225,14 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
         }
       }
 
-      // 记录对话历史
+      // 记录对话历史 + 递增轮数
       if (aiQuestion?.question) {
         setConversationHistory((prev) => [
           ...prev,
           `Q: ${aiQuestion.question}`,
           `A: ${text}`,
         ].slice(-12));
+        setConverseRound((r) => r + 1);
         setAiQuestion(null);
       }
       setContent("");
@@ -265,12 +267,12 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
     setContent(val);
     // 输入停顿 1.5s 后自动触发 AI 追问
     if (converseTimerRef.current) clearTimeout(converseTimerRef.current);
-    if (val.trim().length > 15) {
+    if (val.trim().length > 15 && converseRound <= MAX_ROUNDS) {
       converseTimerRef.current = window.setTimeout(() => {
         fetch("http://localhost:8765/api/v2/converse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idea: val, history: conversationHistory }),
+          body: JSON.stringify({ idea: val, history: conversationHistory, round_num: converseRound }),
         })
           .then((r) => r.json())
           .then((d) => {
@@ -409,18 +411,32 @@ export default function CaptureOverlay({ sessionId, setSessionId, onOpenDashboar
       </div>
 
       {/* AI 追问气泡 */}
-      {aiQuestion && aiQuestion.question && (
+      {converseRound > MAX_ROUNDS && (
+        <div style={{
+          margin: "0 24px 4px", padding: "8px 14px", borderRadius: 12,
+          background: "#FFFBEB", border: "1px solid #FDE68A",
+          fontSize: 12, color: "#D97706", lineHeight: 1.5,
+        }}>
+          💡 已追问 {converseRound-1} 轮，当前想法可直接编织。输入更多细节或用现有想法点"编织所有想法"。
+        </div>
+      )}
+      {aiQuestion && aiQuestion.question && converseRound <= MAX_ROUNDS && (
         <div style={{
           margin: "0 24px 4px", padding: "8px 14px", borderRadius: 12,
           background: "#F0F9FF", border: "1px solid #BAE6FD",
           fontSize: 12, color: "#0369A1", lineHeight: 1.5,
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>💬 {aiQuestion.question}</div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 4 }}>
+            <span style={{ fontWeight: 600 }}>💬 {aiQuestion.question}</span>
+            <span style={{ fontSize: 10, color: "#A0A0AC", whiteSpace:"nowrap" }}>
+              第{converseRound}轮 · {Math.round(aiQuestion.completeness*100)}% 完善
+            </span>
+          </div>
           {aiQuestion.context && (
             <div style={{ fontSize: 11, color: "#6E6E7C" }}>{aiQuestion.context}</div>
           )}
-          {aiQuestion.completeness > 0.7 && (
-            <div style={{ fontSize: 11, color: "#10B981", marginTop: 4 }}>✓ 想法已足够具体，可以提交了</div>
+          {aiQuestion.completeness > 0.6 && (
+            <div style={{ fontSize: 11, color: "#10B981", marginTop: 4 }}>✓ 已足够具体，可提交后直接编织</div>
           )}
         </div>
       )}

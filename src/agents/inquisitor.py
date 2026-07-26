@@ -42,17 +42,29 @@ class InquisitorAgent:
             max_tokens=1500,
         )
 
-    async def converse(self, current_idea: str, history: List[str] | None = None) -> dict:
-        """对话模式：针对当前想法提一个精准追问，引导用户逐步完善"""
+    async def converse(self, current_idea: str, history: List[str] | None = None,
+                        round_num: int = 1) -> dict:
+        """对话模式：引导完善想法。最多3轮，识别用户知识边界"""
         ctx = ""
         if history:
             ctx = "对话历史:\n" + "\n".join(history[-6:])
+        round_hint = ""
+        if round_num >= 3:
+            round_hint = "\n重要：这是最后一轮追问。如果还缺细节，标记 completeness>0.6 让用户去编织。"
+        elif round_num >= 2:
+            round_hint = "\n重要：尽量在1-2轮内结束引导。用户说不知道代表触及知识边界，不要继续追问。"
+
         messages = [
-            {"role": "system", "content": """你是技术导师。用户有模糊想法，通过追问帮ta细化。
-只提1个精准问题，引导思考：约束条件、技术选型、边界场景、性能、一致性。
-如果想法已足够具体(有具体技术栈/量化指标/明确场景)，completeness>0.8。
-输出 JSON: {"question":"...","context":"为什么问","completeness":0.0-1.0}"""},
-            {"role": "user", "content": f"当前想法: {current_idea}\n{ctx}\n请提一个追问。"},
+            {"role": "system", "content": f"""你是技术导师，帮用户完善技术想法。
+
+规则:
+1. 每轮只提1个问题，要具体可回答
+2. 用户回答"不知道/没概念/不确定"时→不要再追问这个方向，换角度或用 completenss>0.6 放行
+3. 想法足够具体(有技术栈或量化指标)→completeness>0.7 建议编织
+4. {round_hint}
+
+输出 JSON: {{"question":"...","context":"为什么问","completeness":0.0-1.0}}"""},
+            {"role": "user", "content": f"当前想法: {current_idea}\n{ctx}\n请提一个追问(第{round_num}轮)。"},
         ]
         data = await self.agent.call_llm_json(messages)
         if data.get("_parse_error"):

@@ -28,6 +28,7 @@ class AnswerRequest(BaseModel):
 class ConverseRequest(BaseModel):
     idea: str
     history: list[str] = []
+    round_num: int = 1
 
 
 class DesignDiffRequest(BaseModel):
@@ -38,7 +39,7 @@ class DesignDiffRequest(BaseModel):
 @router.post("/converse")
 async def converse_with_user(req: ConverseRequest):
     """对话模式：针对单个想法提追问，引导用户逐步细化"""
-    result = await inquisitor.converse(req.idea, req.history or [])
+    result = await inquisitor.converse(req.idea, req.history or [], req.round_num)
     return result
 
 

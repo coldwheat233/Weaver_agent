@@ -1,7 +1,7 @@
-"""OpenAI 兼容 LLM 服务 —— 支持 DeepSeek / OpenAI / Ollama / 自定义
+"""OpenAI 兼容 LLM 服务 + Embedding —— 支持 DeepSeek / OpenAI / Ollama
 
 配置来源: src/utils/runtime_config.py (~/.weaver/config.json)
-协议: OpenAI Chat Completions (所有供应商通用)
+协议: OpenAI Chat Completions + Embeddings
 """
 
 from typing import List, Dict, Optional
@@ -74,6 +74,30 @@ class OpenAICompatibleService(LLMService):
         except Exception as e:
             logger.error(f"LLM API error ({self.base_url}): {e}")
             raise
+
+
+    async def embed(self, texts: List[str], model: str = "text-embedding-3-small") -> List[List[float]]:
+        """生成 embedding 向量 (OpenAI 兼容协议)"""
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{self.base_url}/v1/embeddings",
+                    headers=headers,
+                    json={"model": model, "input": texts},
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            # 按输入顺序返回 embedding 列表
+            embeddings = sorted(data["data"], key=lambda x: x["index"])
+            return [e["embedding"] for e in embeddings]
+        except Exception as e:
+            logger.error(f"Embedding API error: {e}")
+            # 降级: 返回零向量, 让关键词检索兜底
+            return [[0.0] * 1536 for _ in texts]
 
 
 # 向后兼容别名 — 已有代码 import DeepSeekService 不破坏
