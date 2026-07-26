@@ -4,7 +4,7 @@ from typing import List
 
 
 class EmbeddingService:
-    def __init__(self, model: str = "text-embedding-3-small"):
+    def __init__(self, model: str = "qwen3.7-text-embedding"):
         self.model = model
         self._service = None
 
@@ -12,7 +12,12 @@ class EmbeddingService:
     def service(self):
         if self._service is None:
             from src.core.deepseek_service import OpenAICompatibleService
-            self._service = OpenAICompatibleService()
+            from src.utils.runtime_config import RuntimeConfig
+            # embedding 独立供应商——不跟 chat 走同一个 API
+            cfg = RuntimeConfig.load()
+            emb_key = cfg.get("embedding_api_key", cfg.get("api_key", ""))
+            emb_base = cfg.get("embedding_base_url", "https://dashscope.aliyuncs.com/compatible-mode")
+            self._service = OpenAICompatibleService(api_key=emb_key, base_url=emb_base)
         return self._service
 
     async def generate(self, text: str) -> List[float]:
