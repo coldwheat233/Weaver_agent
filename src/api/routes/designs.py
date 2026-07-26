@@ -88,7 +88,7 @@ async def get_design_html(design_id: str):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{doc.title} — Idea Weaver</title>
-<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script src="/static/mermaid.min.js"></script>
 <style>
   :root {{
     --bg: #FCFCFD; --text: #1A1A2E; --text-secondary: #6E6E7C;

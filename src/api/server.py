@@ -102,6 +102,10 @@ async def css_results():
 async def js_results():
     return HTMLResponse(_read_static("results.js"), media_type="application/javascript")
 
+@app.get("/static/mermaid.min.js", response_class=HTMLResponse)
+async def js_mermaid():
+    return HTMLResponse(_read_static("mermaid.min.js"), media_type="application/javascript")
+
 # ── 路由注册 ──
 from src.api.routes import ideas, sessions, weaving, designs, health, assets, v2_dialogue, v3_autonomy, debug, config, feedback, daily_prompt, tech_news, system_health  # noqa: E402
 
