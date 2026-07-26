@@ -38,23 +38,18 @@ async def _generate_daily_question(user_domains: list[str] | None = None) -> dic
         domain_hint = f"用户关注的领域: {', '.join(picks)}。"
 
     llm = OpenAICompatibleService()
+    # 硬编码随机选领域——LLM 自己总是偏好分布式/缓存
+    domains = ["数据结构与算法","编译原理","操作系统","计算机网络","数据库","AI/机器学习","信息安全","前端工程","DevOps","开源社区","软件工程与职业成长"]
+    import random
+    chosen = user_domains and random.random() < 0.4 and random.choice(user_domains) or random.choice(domains)
+
     resp = await llm.complete(
         messages=[{
             "role": "system",
-            "content": f"""你是技术导师。每次给程序员出一个引发思考的技术问题。
-规则:
-1. 问题要开放能引发讨论, 不要有标准答案
-2. 领域要广, 随机选方向: 算法与数据结构、编程语言设计、编译原理、操作系统、计算机网络、数据库、分布式、AI/ML、安全、前端工程、DevOps、开源文化、职业成长
-3. 每次换不同方向, 不要连续两次问同一个领域的问题
-4. 附带一句简短上下文说明
-5. 纯中文
-{domain_hint}
-
-输出 JSON:
-{{"question": "...", "context": "为什么这个问题值得思考"}}"""
+            "content": f"你是技术导师。请为程序员出一个关于「{chosen}」领域的思考题。问题要开放、能引发讨论、没有标准答案。附带一句话说明为什么这个问题值得思考。输出JSON: {{\"question\":\"...\",\"context\":\"...\"}}。纯JSON不要其他文字。"
         }],
-        temperature=0.9,
-        max_tokens=300,
+        temperature=1.0,
+        max_tokens=200,
     )
     try:
         import re
