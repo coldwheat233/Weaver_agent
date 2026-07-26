@@ -77,11 +77,12 @@ async def get_design_html(design_id: str):
     mermaid_blocks = []
     def _save_mermaid(m):
         code = m.group(1)
-        # 修复 LLM 常见 Mermaid 语法错误
-        code = code.replace('“', '"').replace('”', '"')  # 中文引号
-        code = code.replace('"', '"').replace('"', '"')            # 其他变体
-        # subgraph 标签过复杂 → 简化
-        code = _re.sub(r'subgraph\s+".+?"', 'subgraph cluster', code)
+        # 移除 subgraph 中文标签（Mermaid 10 不支持复杂标签）
+        code = _re.sub(r'subgraph\s+[^\n]+', 'subgraph ', code)
+        # 移除行内 \\n 转义（LLM 在 subgraph 标签里嵌入的）
+        code = code.replace('\\n', '\n')
+        # 中文引号 → 英文
+        code = code.replace('“', '"').replace('”', '"')
         mermaid_blocks.append(code)
         return '<div class="mermaid"></div>'
     md = _re.sub(r'```mermaid\n(.*?)```', _save_mermaid, md, flags=_re.DOTALL)
