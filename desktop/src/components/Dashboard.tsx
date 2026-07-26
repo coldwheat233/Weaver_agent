@@ -113,13 +113,8 @@ export default function Dashboard({ onOpenCapture, onClose, onOpenSettings }: Pr
     }
   };
 
-  const openUrl = async (url: string) => {
-    try {
-      const { open } = await import("@tauri-apps/plugin-shell");
-      await open(url);
-    } catch {
-      window.open(url, "_blank");
-    }
+  const openUrl = (url: string) => {
+    window.open(url, "_blank");
   };
 
   const openDesign = (did: string) => {
