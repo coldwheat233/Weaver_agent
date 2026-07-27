@@ -108,57 +108,137 @@ def _should_iterate(state: WeaverState) -> str:
 # 工作流执行
 # ═══════════════════════════════════════════
 
-async def execute_weave_workflow(session_id: str) -> dict:
-    """执行一次完整的编织工作流。
+async def run_weave_pipeline(session_id: str) -> dict:
+    """执行一次完整的编织流水线 — Collector → Weaver → Architect → Critic.
 
+    带混合检索增强 + Critic 反馈迭代。
     返回 {"design_id": str, "status": str}
     """
     from src.storage.database import get_async_session
+    from src.storage.idea_repo import IdeaRepo
+    from src.storage.design_repo import DesignRepo
     from src.storage.session_repo import SessionRepo
     from uuid import UUID
 
+    from src.core.deepseek_service import OpenAICompatibleService
+    llm = OpenAICompatibleService()
+
+    # 加载会话和想法
     async with await get_async_session() as db:
-        repo = SessionRepo(db)
-        session = await repo.get(UUID(session_id))
+        idea_repo = IdeaRepo(db)
+        session = await SessionRepo(db).get(UUID(session_id))
         if not session:
-            raise ValueError(f"Session {session_id} not found")
+            return {"status": "failed", "error": f"session {session_id} not found"}
 
-    # 初始状态
-    initial_state: WeaverState = {
-        "session_id": session_id,
-        "north_star": session.north_star,
-        "iteration": 1,
-        "max_iterations": settings.WEAVER_MAX_ITERATIONS,
-        "status": "weaving",
-        "errors": [],
-        "phases": {},
-    }
+        if session.input_idea_ids:
+            ideas = await idea_repo.get_by_ids(session.input_idea_ids)
+        else:
+            ideas = await idea_repo.list_by_session(session_id)
 
-    # 编译带 checkpoint 的工作流
-    checkpoint_path = str(settings.checkpoint_db_path)
-    checkpointer = SqliteSaver.from_conn_string(checkpoint_path)
-    workflow = build_weaving_workflow()
-    app = workflow.compile(checkpointer=checkpointer)
+    if not ideas:
+        return {"status": "failed", "error": "no ideas in session"}
 
-    # 执行
-    config = {"configurable": {"thread_id": session_id}}
-    final_state = await app.ainvoke(initial_state, config)
+    north_star = session.north_star
 
-    # 更新会话状态
+    # ── 混合检索增强 ──
+    try:
+        from src.storage.vector_store import VectorStore
+        from src.core.embeddings import EmbeddingService
+        from src.core.retrieval import HybridRetriever
+
+        emb_svc = EmbeddingService()
+        vec_store = VectorStore()
+
+        async with await get_async_session() as db2:
+            retriever = HybridRetriever(vec_store, IdeaRepo(db2), emb_svc)
+            historical = await retriever.retrieve_for_weaving(
+                north_star=north_star,
+                new_node_ids=[idea.id for idea in ideas],
+                divergence_degree=getattr(session, 'divergence_degree', None) or 2,
+                max_nodes=20,
+            )
+
+        current_ids = {idea.id for idea in ideas}
+        new_count = 0
+        for h in historical:
+            if h.id not in current_ids:
+                ideas.append(h)
+                current_ids.add(h.id)
+                new_count += 1
+
+        if new_count > 0:
+            logger.info(
+                f"Hybrid retrieval enriched weave: {new_count} historical ideas "
+                f"(total {len(ideas)} nodes)"
+            )
+    except Exception as e:
+        logger.warning(f"Hybrid retrieval skipped (embeddings may not be configured): {e}")
+
+    # ── Agent 流水线 (带 Critic 反馈迭代) ──
+    max_iter = getattr(session, 'max_iterations', None) or settings.WEAVER_MAX_ITERATIONS
+    feedback = None
+
+    for iteration in range(1, max_iter + 1):
+        # Weaver
+        from src.agents.weaver import WeaverAgent
+        w = WeaverAgent(llm)
+        result = await w.weave(ideas, north_star, feedback=feedback)
+        clusters = WeaverAgent.build_clusters_from_result(result, ideas)
+        rels = WeaverAgent.build_relationships(result, ideas)
+        conflicts = WeaverAgent.build_conflicts(result, ideas)
+
+        # Architect
+        from src.agents.architect import ArchitectAgent
+        a = ArchitectAgent(llm)
+        bridges = result.get("cross_domain_bridges", [])
+        design = await a.design(
+            clusters, rels, bridges,
+            [{"type": c.conflict_type.value, "description": c.description} for c in conflicts],
+            north_star,
+        )
+
+        # Critic (with static Pass1 pre-check)
+        from src.agents.critic import CriticAgent
+        cr = CriticAgent(llm)
+        fb = await cr.critique(design, ideas)
+
+        if fb.approved:
+            logger.info(f"Weave passed critic on iteration {iteration}")
+            break
+
+        if iteration < max_iter:
+            logger.info(
+                f"Weave iteration {iteration} rejected "
+                f"(coherence={fb.scores.coherence:.2f} feasibility={fb.scores.feasibility:.2f}), "
+                f"re-weaving..."
+            )
+            feedback = {
+                "blocking_issues": fb.blocking_issues,
+                "suggestions": fb.suggestions,
+                "feedback": fb.feedback,
+            }
+        else:
+            logger.warning(f"Max iterations ({max_iter}) reached, accepting best result")
+
+    # 保存设计
     async with await get_async_session() as db:
-        repo = SessionRepo(db)
-        if final_state.get("errors"):
-            await repo.mark_failed(session_id, "; ".join(final_state["errors"]))
-            return {"status": "failed", "errors": final_state["errors"]}
+        design_repo = DesignRepo(db)
+        design.innovation_score = fb.scores.innovation
+        design.coherence_score = fb.scores.coherence
+        design.feasibility_score = fb.scores.feasibility
+        design.critic_approval = fb.approved
+        design.critic_feedback = str(fb.blocking_issues) if fb.blocking_issues else None
+        await design_repo.create(design)
 
-        # 从 phases 中提取 design_id
-        phases = final_state.get("phases", {})
-        design_phase = phases.get("design", {})
-        design_id = design_phase.get("design_id", "") if isinstance(design_phase, dict) else ""
+    logger.info(f"Weave complete: design={design.id} approved={fb.approved}")
+    return {"status": "complete", "design_id": str(design.id)}
 
-        await repo.mark_complete(session_id, str(design_id))
-        logger.info(f"Workflow complete for session {session_id}, design={design_id}")
-        return {"status": "complete", "design_id": str(design_id)}
+
+# ── deprecated: 旧 LangGraph 路径，未实现，请使用 run_weave_pipeline ──
+async def execute_weave_workflow(session_id: str) -> dict:
+    """[已废弃] 请使用 run_weave_pipeline()"""
+    logger.warning("execute_weave_workflow is deprecated, redirecting to run_weave_pipeline")
+    return await run_weave_pipeline(session_id)
 
 
 # ═══════════════════════════════════════════

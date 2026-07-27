@@ -105,8 +105,8 @@ class AutoProposalEngine:
                 await session_repo.create(session)
 
             # 触发编织
-            from src.core.workflow import execute_weave_workflow
-            result = await execute_weave_workflow(str(session.id))
+            from src.core.workflow import run_weave_pipeline
+            result = await run_weave_pipeline(str(session.id))
 
             proposal = {
                 "session_id": str(session.id),

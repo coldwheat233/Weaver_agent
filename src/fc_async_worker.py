@@ -26,13 +26,13 @@ async def handle_weave_event(event: dict):
 
     logger.info(f"Async weave starting for session {session_id}")
 
-    from src.core.workflow import execute_weave_workflow
+    from src.core.workflow import run_weave_pipeline
     from src.storage.database import get_async_session
     from src.storage.session_repo import SessionRepo
     from uuid import UUID
 
     try:
-        result = await execute_weave_workflow(session_id)
+        result = await run_weave_pipeline(session_id)
         logger.info(f"Async weave complete: {result}")
         return result
     except Exception as e:

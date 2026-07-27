@@ -45,12 +45,31 @@ class CriticAgent:
 
     async def critique(self, design: DesignDocument,
                        requirement_nodes: list | None = None) -> CriticFeedback:
-        """评估设计文档"""
+        """评估设计文档 — Pass1 静态检查 + Pass2 LLM 审计"""
 
         # 截断过长的文档
         content = design.content_markdown
         if len(content) > 12000:
             content = content[:12000] + "\n\n...(内容过长，已截断)"
+
+        # ── Pass 1: 零 LLM 成本静态结构检查 ──
+        from src.agents.critic_pass1 import static_check
+        pass1 = static_check(content, requirement_nodes)
+        pass1_issues = []
+        if pass1.component_ref_score < 0.5:
+            pass1_issues.append({
+                "severity": "major",
+                "category": "mermaid_integrity",
+                "description": f"仅 {pass1.component_ref_score:.0%} 的 Mermaid 组件在文档中有定义",
+                "suggestion": "检查架构图的组件与文档章节是否一一对应",
+            })
+        if pass1.requirement_coverage_score < 0.5:
+            pass1_issues.append({
+                "severity": "major",
+                "category": "requirement_coverage",
+                "description": f"仅 {pass1.requirement_coverage_score:.0%} 的原始需求在设计中得到响应",
+                "suggestion": "逐条检查原始问题是否都有方案覆盖",
+            })
 
         req_text = ""
         if requirement_nodes:
@@ -59,6 +78,7 @@ class CriticAgent:
                 if hasattr(n, 'standardized_content'):
                     req_text += f"- {n.standardized_content}\n"
 
+        # ── Pass 2: LLM 深度审计 ──
         messages = [
             {"role": "system", "content": CRITIC_SYSTEM},
             {"role": "user", "content": f"设计文档：\n\n{content}{req_text}\n\n请评估。"},
@@ -71,9 +91,13 @@ class CriticAgent:
             return CriticFeedback(
                 approved=True,
                 scores=CriticScores(coherence=0.6, innovation=0.5, feasibility=0.5),
-                blocking_issues=[],
+                blocking_issues=pass1_issues,
                 strengths=["JSON 解析失败，默认通过"],
             )
+
+        # 合并 Pass1 静态发现到 LLM 的 blocking_issues
+        llm_blocking = data.get("blocking_issues", [])
+        data["blocking_issues"] = pass1_issues + llm_blocking
 
         scores_data = data.get("scores", {})
         feedback = CriticFeedback(

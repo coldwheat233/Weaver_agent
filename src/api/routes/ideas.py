@@ -64,6 +64,28 @@ async def submit_idea(
         return {"error": "content 和 file 至少提供一个"}, 400
 
     actual_content = content or "(图片/语音输入)"
+
+    # ── L1 信号过滤：拦截垃圾/重复输入 ──
+    # 1. 纯文本需 ≥ 5 个有效字符
+    if actual_source == SourceType.TEXT and len(content.strip()) < 5:
+        return {"error": "内容太短（至少 5 个字符）"}, 400
+    # 2. 近重复检测：与最近 20 条想法做简单去重
+    try:
+        async with await get_async_session() as db:
+            existing = await IdeaRepo(db).list_active(limit=20)
+            for old in existing:
+                old_text = old.standardized_content or old.raw_content or ""
+                # 简单 Jaccard 字符级相似度 > 0.85 → 重复
+                if len(actual_content) > 10 and len(old_text) > 10:
+                    set_a = set(actual_content)
+                    set_b = set(old_text)
+                    intersection = len(set_a & set_b)
+                    union = len(set_a | set_b)
+                    if union > 0 and intersection / union > 0.85:
+                        return {"error": "与已有想法高度重复", "duplicate_of": str(old.id)}, 409
+    except Exception:
+        pass  # 去重失败不阻塞提交
+
     node = await collector.process(
         content=actual_content,
         source_type=actual_source or SourceType.TEXT,
