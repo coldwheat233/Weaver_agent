@@ -1,6 +1,6 @@
 {
   "productName": "Idea Weaver",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "com.idea-weaver.app",
   "build": {
     "frontendDist": "../dist",
